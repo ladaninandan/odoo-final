@@ -1,7 +1,6 @@
 import Order from '../models/Order.js';
 import Table from '../models/Table.js';
 import generateOrderNumber from '../utils/generateOrderNumber.js';
-import { setTableStatus, setOrderKitchenStage } from '../utils/redisCache.js';
 import { releaseTableForOrder, allKitchenItemsComplete } from '../utils/releaseTable.js';
 
 export const getOrders = async (req, res) => {
@@ -82,7 +81,6 @@ export const createOrder = async (req, res) => {
       status: 'occupied',
       currentOrder: order._id,
     });
-    await setTableStatus(tableId, 'occupied');
 
     const io = req.app.get('io');
     io.to('pos').emit('table:status_update', { tableId: String(tableId), status: 'occupied' });
@@ -145,9 +143,6 @@ export const sendToKitchen = async (req, res) => {
     });
     await order.save();
 
-    // Cache kitchen stage
-    await setOrderKitchenStage(order._id, 'to_cook');
-
     // Emit to Kitchen Display + Customer Display (full order for second screen)
     const io = req.app.get('io');
     const orderPayload = order.toObject();
@@ -189,7 +184,6 @@ export const cancelOrder = async (req, res) => {
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     await Table.findByIdAndUpdate(order.table, { status: 'available', currentOrder: null });
-    await setTableStatus(order.table, 'available');
 
     const io = req.app.get('io');
     io.to('pos').emit('table:status_update', { tableId: String(order.table), status: 'available' });

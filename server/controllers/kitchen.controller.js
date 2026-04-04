@@ -1,5 +1,4 @@
 import Order from '../models/Order.js';
-import { setOrderKitchenStage } from '../utils/redisCache.js';
 import { releaseTableForOrder } from '../utils/releaseTable.js';
 
 const STAGE_FLOW = {
@@ -84,7 +83,6 @@ export const advanceOrderStage = async (req, res) => {
     }
 
     await order.save();
-    await setOrderKitchenStage(order._id, newStage || 'completed');
 
     const io = req.app.get('io');
     io.to('pos').emit('kitchen:stage_update', { orderId: order._id, stage: newStage || 'completed' });

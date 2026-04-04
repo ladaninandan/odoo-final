@@ -2,9 +2,9 @@ import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import Order from '../models/Order.js';
 import Table from '../models/Table.js';
+import SelfOrderLink from '../models/SelfOrderLink.js';
 import generateSelfOrderToken from '../utils/generateSelfOrderToken.js';
 import generateOrderNumber from '../utils/generateOrderNumber.js';
-import { cacheSetJSON, cacheGetJSON, selfOrderTokenKey, setTableStatus } from '../utils/redisCache.js';
 
 const TOKEN_TTL = 8 * 60 * 60; // 8 hours
 
@@ -17,13 +17,17 @@ export const generateToken = async (req, res) => {
 
     const token = generateSelfOrderToken(tableId, sessionId);
 
-    // Store in Redis
-    await cacheSetJSON(selfOrderTokenKey(token), {
-      tableId,
-      sessionId,
-      tableNumber: table.tableNumber,
-      createdAt: new Date().toISOString(),
-    }, TOKEN_TTL);
+    await SelfOrderLink.findOneAndUpdate(
+      { token },
+      {
+        token,
+        tableId,
+        sessionId,
+        tableNumber: table.tableNumber,
+        expiresAt: new Date(Date.now() + TOKEN_TTL * 1000),
+      },
+      { upsert: true }
+    );
 
     const menuUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/order/${token}`;
 
@@ -33,12 +37,18 @@ export const generateToken = async (req, res) => {
   }
 };
 
+async function getValidSelfOrderToken(token) {
+  return SelfOrderLink.findOne({
+    token,
+    expiresAt: { $gt: new Date() },
+  }).lean();
+}
+
 export const getMenu = async (req, res) => {
   try {
     const { token } = req.query;
 
-    // Validate token
-    const tokenData = await cacheGetJSON(selfOrderTokenKey(token));
+    const tokenData = await getValidSelfOrderToken(token);
     if (!tokenData) return res.status(401).json({ message: 'Invalid or expired token' });
 
     const [products, categories] = await Promise.all([
@@ -55,7 +65,7 @@ export const getMenu = async (req, res) => {
 export const getTableInfo = async (req, res) => {
   try {
     const { token } = req.query;
-    const tokenData = await cacheGetJSON(selfOrderTokenKey(token));
+    const tokenData = await getValidSelfOrderToken(token);
     if (!tokenData) return res.status(401).json({ message: 'Invalid or expired token' });
 
     const table = await Table.findById(tokenData.tableId);
@@ -69,7 +79,7 @@ export const placeOrder = async (req, res) => {
   try {
     const { token, items, notes } = req.body;
 
-    const tokenData = await cacheGetJSON(selfOrderTokenKey(token));
+    const tokenData = await getValidSelfOrderToken(token);
     if (!tokenData) return res.status(401).json({ message: 'Invalid or expired token' });
 
     const orderNumber = await generateOrderNumber();
@@ -106,14 +116,11 @@ export const placeOrder = async (req, res) => {
       notes: notes || '',
     });
 
-    // Mark table as occupied
     await Table.findByIdAndUpdate(tokenData.tableId, {
       status: 'occupied',
       currentOrder: order._id,
     });
-    await setTableStatus(tokenData.tableId, 'occupied');
 
-    // Emit to POS
     const io = req.app.get('io');
     io.to('pos').emit('table:status_update', { tableId: tokenData.tableId, status: 'occupied' });
     io.to('pos').emit('order:new', order.toObject());
@@ -127,7 +134,7 @@ export const placeOrder = async (req, res) => {
 export const getOrderStatus = async (req, res) => {
   try {
     const { token } = req.query;
-    const tokenData = await cacheGetJSON(selfOrderTokenKey(token));
+    const tokenData = await getValidSelfOrderToken(token);
     if (!tokenData) return res.status(401).json({ message: 'Invalid or expired token' });
 
     const order = await Order.findOne({

@@ -28,17 +28,6 @@ const FloorPlan = () => {
     dispatch(fetchCurrentSession());
   }, [dispatch]);
 
-  /** Backup sync — socket can still miss events; keeps table occupied/available accurate */
-  useEffect(() => {
-    const id = setInterval(() => dispatch(fetchFloors()), 4000);
-    const onFocus = () => dispatch(fetchFloors());
-    window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [dispatch]);
-
   const handleTableClick = (table) => {
     if (!session) {
       toast.error('Please open a session first');

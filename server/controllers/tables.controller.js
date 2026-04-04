@@ -1,5 +1,4 @@
 import Table from '../models/Table.js';
-import { setTableStatus } from '../utils/redisCache.js';
 
 export const getTables = async (req, res) => {
   try {
@@ -20,7 +19,6 @@ export const createTable = async (req, res) => {
   try {
     const { floor, tableNumber, seats } = req.body;
     const table = await Table.create({ floor, tableNumber, seats });
-    await setTableStatus(table._id, 'available');
     res.status(201).json(table);
   } catch (err) {
     res.status(400).json({ message: 'Failed to create table', error: err.message });
@@ -46,9 +44,6 @@ export const updateTableStatus = async (req, res) => {
       { new: true }
     );
     if (!table) return res.status(404).json({ message: 'Table not found' });
-
-    // Update Redis cache
-    await setTableStatus(table._id, status);
 
     // Emit socket event
     const io = req.app.get('io');

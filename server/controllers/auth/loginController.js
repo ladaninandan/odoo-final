@@ -3,7 +3,6 @@ import BlockedIp from '../../models/BlockedIp.js';
 import LoginAttempt from '../../models/LoginAttempt.js';
 import RefreshToken from '../../models/RefreshToken.js';
 import UserSession from '../../models/UserSession.js';
-import redisClient from '../../config/redis.js';
 import mongoose from 'mongoose';
 import { generateTokens } from './authUtils.js';
 
@@ -42,9 +41,6 @@ export const loginUser = async (req, res) => {
       token: refreshToken,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
-
-    // Save to Redis explicitly for device-level logout
-    await redisClient.set(`session:refresh:${user._id}:${sessionId}`, refreshToken, 'EX', 7 * 24 * 60 * 60);
 
     // 3. Multi-Device Tracking: Record this successfully authenticated session
     await UserSession.create({

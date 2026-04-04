@@ -1,5 +1,4 @@
 import Session from '../models/Session.js';
-import { setActiveSession, getActiveSession, clearActiveSession } from '../utils/redisCache.js';
 
 export const getSessions = async (req, res) => {
   try {
@@ -14,19 +13,8 @@ export const getSessions = async (req, res) => {
 
 export const getCurrentSession = async (req, res) => {
   try {
-    // Check Redis first
-    const cached = await getActiveSession(req.user._id);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    // Fallback to MongoDB
     const session = await Session.findOne({ openedBy: req.user._id, status: 'open' })
       .populate('openedBy', 'first_name last_name');
-
-    if (session) {
-      await setActiveSession(req.user._id, session.toObject());
-    }
 
     res.json(session);
   } catch (err) {
@@ -36,7 +24,6 @@ export const getCurrentSession = async (req, res) => {
 
 export const openSession = async (req, res) => {
   try {
-    // Check if user already has an open session
     const existing = await Session.findOne({ openedBy: req.user._id, status: 'open' });
     if (existing) {
       return res.status(400).json({ message: 'You already have an open session' });
@@ -49,7 +36,6 @@ export const openSession = async (req, res) => {
     });
 
     const populated = await session.populate('openedBy', 'first_name last_name');
-    await setActiveSession(req.user._id, populated.toObject());
 
     res.status(201).json(populated);
   } catch (err) {
@@ -76,9 +62,6 @@ export const closeSession = async (req, res) => {
     session.closingBalance = closingBalance || 0;
     await session.save();
 
-    await clearActiveSession(session.openedBy);
-
-    // Notify all POS clients
     const io = req.app.get('io');
     io.to('pos').emit('session:closed', { sessionId: session._id });
 
