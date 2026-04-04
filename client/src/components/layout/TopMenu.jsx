@@ -20,7 +20,7 @@ const TopMenu = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { user, isAdmin } = useAuth();
-  const { activeTable } = useSelector((state) => state.cart);
+  const { activeTable, activeOrder, items: cartItems } = useSelector((state) => state.cart);
   const { current: session } = useSelector((state) => state.session);
 
   const handleLogout = async () => {
@@ -29,14 +29,36 @@ const TopMenu = () => {
     navigate('/login');
   };
 
-  const isOrderScreen = location.pathname.includes('/pos/order');
-  const isPaymentScreen = location.pathname.includes('/pos/payment');
+  const orderMatch = location.pathname.match(/^\/pos\/order\/([^/]+)/);
+  const paymentMatch = location.pathname.includes('/pos/payment/');
+  const customerMatch = location.pathname.match(/^\/pos\/table\/([^/]+)\/customer/);
+
+  const handlePosBack = () => {
+    if (customerMatch) navigate('/pos/floor');
+    else if (orderMatch) {
+      const tableId = orderMatch[1];
+      const tableMatches = activeTable && String(activeTable._id) === String(tableId);
+      const orderMatchesTable =
+        tableMatches &&
+        activeOrder &&
+        String(activeTable.currentOrder?._id ?? activeTable.currentOrder ?? '') === String(activeOrder);
+      const fromOccupiedTable =
+        location.state?.fromOccupiedTable === true ||
+        (tableMatches && cartItems.some((i) => i.locked)) ||
+        (tableMatches && activeTable.status === 'occupied' && orderMatchesTable);
+      if (fromOccupiedTable) navigate('/pos/floor');
+      else navigate(`/pos/table/${tableId}/customer`);
+    } else if (paymentMatch) navigate('/pos/floor');
+    else navigate('/pos/floor');
+  };
+
+  const showPosBack = Boolean(customerMatch || orderMatch || paymentMatch);
 
   return (
     <header className="h-14 bg-card border-b flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-3">
-        {(isOrderScreen || isPaymentScreen) && (
-          <Button variant="ghost" size="icon" onClick={() => navigate('/pos/floor')}>
+        {showPosBack && (
+          <Button variant="ghost" size="icon" onClick={handlePosBack} aria-label="Back">
             <ChevronLeft className="h-5 w-5" />
           </Button>
         )}
@@ -89,10 +111,13 @@ const TopMenu = () => {
             {isAdmin && (
               <>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/admin/customers')}>Customers</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/admin/sessions')}>Sessions</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/admin/settings')}>Settings</DropdownMenuItem>
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/pos/customers')}>Customers</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" /> Logout

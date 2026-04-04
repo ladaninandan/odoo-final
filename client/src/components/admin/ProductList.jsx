@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts, fetchCategories, createProduct, updateProduct, deleteProduct } from '../../store/slices/productsSlice';
 import { Button } from '../ui/Button';
@@ -19,8 +19,9 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Pencil, Trash2, Package, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getServerOrigin } from '../../utils/lanServerUrl';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = getServerOrigin();
 
 const emptyForm = { name: '', category: '', price: '', description: '', taxRate: 5, sendToKitchen: true, isActive: true };
 
@@ -31,20 +32,52 @@ const ProductList = () => {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const clearPreview = useCallback(() => {
+    setImagePreviewUrl((prev) => {
+      if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const handleImageFileChange = useCallback((e) => {
+    const f = e.target.files?.[0];
+    setImageFile(f || null);
+    setImagePreviewUrl((prev) => {
+      if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      if (f) return URL.createObjectURL(f);
+      if (editId) {
+        const p = products.find((x) => x._id === editId);
+        return p?.image ? `${API_URL}${p.image}` : null;
+      }
+      return null;
+    });
+  }, [editId, products]);
 
   useEffect(() => {
     dispatch(fetchProducts());
     dispatch(fetchCategories());
   }, [dispatch]);
 
-  const openCreate = () => { setForm(emptyForm); setEditId(null); setImageFile(null); setDialogOpen(true); };
+  const openCreate = () => {
+    clearPreview();
+    setForm(emptyForm);
+    setEditId(null);
+    setImageFile(null);
+    setDialogOpen(true);
+  };
   const openEdit = (product) => {
+    clearPreview();
     setForm({
       name: product.name, category: product.category?._id || '', price: product.price,
       description: product.description, taxRate: product.taxRate, sendToKitchen: product.sendToKitchen, isActive: product.isActive,
     });
-    setEditId(product._id); setImageFile(null); setDialogOpen(true);
+    setEditId(product._id);
+    setImageFile(null);
+    setImagePreviewUrl(product.image ? `${API_URL}${product.image}` : null);
+    setDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -63,6 +96,8 @@ const ProductList = () => {
         toast.success('Product created!');
       }
       setDialogOpen(false);
+      clearPreview();
+      setImageFile(null);
     } catch (err) {
       toast.error(err || 'Failed');
     }
@@ -141,7 +176,16 @@ const ProductList = () => {
       </Card>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            clearPreview();
+            setImageFile(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editId ? 'Edit Product' : 'New Product'}</DialogTitle>
@@ -160,7 +204,25 @@ const ProductList = () => {
               <div><Label>Tax %</Label><Input type="number" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} /></div>
             </div>
             <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>
-            <div><Label>Image</Label><Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} /></div>
+            <div className="space-y-2">
+              <Label>Image</Label>
+              <div className="flex flex-col sm:flex-row gap-3 items-start">
+                <div className="h-28 w-28 rounded-lg border bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                  {imagePreviewUrl ? (
+                    <img src={imagePreviewUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Package className="h-10 w-10 text-muted-foreground/50" />
+                  )}
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="cursor-pointer sm:pt-2"
+                  onChange={handleImageFileChange}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">JPEG, PNG, WebP or GIF · max 5 MB</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

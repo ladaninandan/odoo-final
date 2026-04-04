@@ -8,11 +8,14 @@ import { Toaster } from '../ui/Toaster';
 import { cn } from '../../lib/utils';
 import {
   LayoutDashboard, Package, Grid3X3, Armchair,
-  Clock, BarChart3, Settings, LogOut, ChevronLeft, Users,
+  Clock, BarChart3, Settings, LogOut, ChevronLeft, Users, UserCircle,
+  ShoppingBag,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
+  { to: '/admin/customers', icon: UserCircle, label: 'Customers' },
   { to: '/admin/products', icon: Package, label: 'Products' },
   { to: '/admin/categories', icon: Grid3X3, label: 'Categories' },
   { to: '/admin/floors', icon: Armchair, label: 'Floors & Tables' },

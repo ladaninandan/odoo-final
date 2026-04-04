@@ -1,8 +1,7 @@
 import { io } from 'socket.io-client';
+import { getSocketUrl } from '../utils/lanServerUrl';
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-
-const socket = io(SOCKET_URL, {
+const socket = io(getSocketUrl(), {
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: 10,

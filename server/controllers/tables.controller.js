@@ -1,4 +1,5 @@
 import Table from '../models/Table.js';
+import { invalidateSelfOrderLinksForTable } from '../utils/releaseTable.js';
 
 export const getTables = async (req, res) => {
   try {
@@ -29,6 +30,9 @@ export const updateTable = async (req, res) => {
   try {
     const table = await Table.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!table) return res.status(404).json({ message: 'Table not found' });
+    if (table.status === 'available') {
+      await invalidateSelfOrderLinksForTable(req.params.id);
+    }
     res.json(table);
   } catch (err) {
     res.status(400).json({ message: 'Failed to update table', error: err.message });
@@ -44,6 +48,10 @@ export const updateTableStatus = async (req, res) => {
       { new: true }
     );
     if (!table) return res.status(404).json({ message: 'Table not found' });
+
+    if (status === 'available') {
+      await invalidateSelfOrderLinksForTable(req.params.id);
+    }
 
     // Emit socket event
     const io = req.app.get('io');

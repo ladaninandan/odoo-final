@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchFloors, selectFloor } from '../../store/slices/floorsSlice';
-import { setActiveTable } from '../../store/slices/cartSlice';
+import { setActiveTable, setActiveCustomer, clearLineItems } from '../../store/slices/cartSlice';
 import { fetchCurrentSession, openSession } from '../../store/slices/sessionSlice';
 import { formatCurrency } from '../../utils/formatCurrency';
 import PosStopSessionButton from './PosStopSessionButton';
@@ -34,7 +34,15 @@ const FloorPlan = () => {
       return;
     }
     dispatch(setActiveTable(table));
-    navigate(`/pos/order/${table._id}`);
+    if (table.status === 'occupied' && table.currentOrder) {
+      dispatch(setActiveCustomer(null));
+      dispatch(clearLineItems());
+      navigate(`/pos/order/${table._id}`, { state: { fromOccupiedTable: true } });
+      return;
+    }
+    dispatch(setActiveCustomer(null));
+    dispatch(clearLineItems());
+    navigate(`/pos/table/${table._id}/customer`);
   };
 
   const handleOpenSession = async () => {

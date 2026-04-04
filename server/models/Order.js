@@ -21,6 +21,7 @@ const orderSchema = new mongoose.Schema(
   {
     orderNumber: { type: String, required: true, unique: true },
     session: { type: mongoose.Schema.Types.ObjectId, ref: 'Session' },
+    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     items: [orderItemSchema],
@@ -38,6 +39,9 @@ const orderSchema = new mongoose.Schema(
       default: 'pos',
     },
     selfOrderToken: { type: String, default: '' },
+    /** Self-order guest contact (no Customer record) */
+    guestName: { type: String, default: '' },
+    guestPhone: { type: String, default: '' },
     notes: { type: String, default: '' },
   },
   { timestamps: true }

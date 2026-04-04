@@ -7,13 +7,32 @@ export const fetchOrders = createAsyncThunk('orders/fetchAll', async (params, { 
 });
 
 export const createOrder = createAsyncThunk('orders/create', async (orderData, { rejectWithValue }) => {
-  try { const { data } = await ordersApi.create(orderData); return data; }
-  catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to create order'); }
+  try {
+    const { data } = await ordersApi.create(orderData);
+    return data;
+  } catch (err) {
+    const msg =
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      err.message ||
+      'Failed to create order';
+    return rejectWithValue(msg);
+  }
 });
 
 export const sendToKitchen = createAsyncThunk('orders/sendToKitchen', async (id, { rejectWithValue }) => {
   try { const { data } = await ordersApi.sendToKitchen(id); return data; }
   catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to send to kitchen'); }
+});
+
+export const updateOrder = createAsyncThunk('orders/update', async ({ id, data }, { rejectWithValue }) => {
+  try {
+    const { data: res } = await ordersApi.update(id, data);
+    return res;
+  } catch (err) {
+    const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update order';
+    return rejectWithValue(msg);
+  }
 });
 
 const ordersSlice = createSlice({
@@ -38,6 +57,11 @@ const ordersSlice = createSlice({
         const idx = state.list.findIndex((o) => o._id === payload._id);
         if (idx !== -1) state.list[idx] = payload;
         state.currentOrder = payload;
+      })
+      .addCase(updateOrder.fulfilled, (state, { payload }) => {
+        const idx = state.list.findIndex((o) => o._id === payload._id);
+        if (idx !== -1) state.list[idx] = payload;
+        if (state.currentOrder?._id === payload._id) state.currentOrder = payload;
       });
   },
 });

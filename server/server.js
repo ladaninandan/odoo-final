@@ -21,6 +21,7 @@ import sessionsRoutes from './routes/sessions.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import selfOrderRoutes from './routes/selfOrder.routes.js';
 import usersRoutes from './routes/users.routes.js';
+import customersRoutes from './routes/customers.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorMiddleware.js';
 import registerSocketHandlers from './socket/socketHandlers.js';
 
@@ -36,10 +37,19 @@ connectDB();
 const app = express();
 const httpServer = createServer(app);
 
+const isProd = process.env.NODE_ENV === 'production';
+/** Dev: allow any origin (phone on LAN). Prod: set CORS_ORIGINS=comma-separated list */
+const corsAllowed = isProd
+  ? (process.env.CORS_ORIGINS || process.env.CLIENT_URL || 'http://localhost:3000')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : true;
+
 // Socket.IO setup
 const io = new SocketIO(httpServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: corsAllowed,
     credentials: true,
   },
 });
@@ -63,10 +73,10 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS setup
+// CORS — must include http://<your-lan-ip>:3000 in production, or use dev (reflects origin)
 app.use(cors({
-    origin: 'http://localhost:3000',
-    credentials: true,
+  origin: corsAllowed,
+  credentials: true,
 }));
 
 // Serve uploaded files
@@ -85,6 +95,7 @@ app.use('/api/sessions', sessionsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/self-order', selfOrderRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/customers', customersRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');
@@ -96,4 +107,6 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-httpServer.listen(PORT, () => console.log(`Server running on port ${PORT} (HTTP + Socket.IO)`));
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} (HTTP + Socket.IO), bound to 0.0.0.0 — reachable on LAN`);
+});

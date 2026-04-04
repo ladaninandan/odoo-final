@@ -3,7 +3,7 @@ import PaymentMethod from '../models/PaymentMethod.js';
 import Order from '../models/Order.js';
 import Session from '../models/Session.js';
 import generateUPIQR from '../utils/generateQR.js';
-import { releaseTableForOrder, allKitchenItemsComplete } from '../utils/releaseTable.js';
+import { releaseTableForOrder } from '../utils/releaseTable.js';
 
 export const initiatePayment = async (req, res) => {
   try {
@@ -60,8 +60,8 @@ export const confirmPayment = async (req, res) => {
     io.to('pos').emit('payment:confirmed', { orderId: payment.order, paymentId: payment._id });
     io.to('customer').emit('payment:confirmed', { orderId: payment.order });
 
-    // Free table only if kitchen already finished all items — otherwise stay occupied until kitchen completes
-    if (order.table && allKitchenItemsComplete(order)) {
+    // POS flow: table frees when payment is taken (kitchen may still be in progress)
+    if (order.table) {
       await releaseTableForOrder(order, io);
     }
 

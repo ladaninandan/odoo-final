@@ -49,6 +49,10 @@ const useSocket = () => {
       dispatch(fetchKitchenOrders());
     };
 
+    const onOrderUpdated = () => {
+      dispatch(fetchKitchenOrders());
+    };
+
     const onOrderStatusUpdate = ({ orderId, status }) => {
       dispatch({ type: 'orders/updateOrderStatus', payload: { orderId, status } });
       dispatch({ type: 'customerDisplay/updateStatus', payload: status });
@@ -56,10 +60,12 @@ const useSocket = () => {
 
     const onItemPrepared = ({ orderId, itemId }) => {
       dispatch({ type: 'kitchen/markItemPrepared', payload: { orderId, itemId } });
+      dispatch(fetchKitchenOrders());
     };
 
     const onKitchenStage = ({ orderId, stage }) => {
       dispatch({ type: 'kitchen/updateStage', payload: { orderId, stage } });
+      dispatch(fetchKitchenOrders());
     };
 
     const onTableStatus = ({ tableId, status }) => {
@@ -78,6 +84,7 @@ const useSocket = () => {
 
     socket.on('connect', onConnect);
     socket.on('order:new', onOrderNew);
+    socket.on('order:updated', onOrderUpdated);
     socket.on('order:status_update', onOrderStatusUpdate);
     socket.on('order:item_prepared', onItemPrepared);
     socket.on('kitchen:stage_update', onKitchenStage);
@@ -99,6 +106,7 @@ const useSocket = () => {
       }
       socket.off('connect', onConnect);
       socket.off('order:new', onOrderNew);
+      socket.off('order:updated', onOrderUpdated);
       socket.off('order:status_update', onOrderStatusUpdate);
       socket.off('order:item_prepared', onItemPrepared);
       socket.off('kitchen:stage_update', onKitchenStage);

@@ -11,6 +11,20 @@ export const advanceStage = createAsyncThunk('kitchen/advanceStage', async (id, 
   catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to advance stage'); }
 });
 
+/** Mark one line item as kitchen-completed; refreshes queue from server */
+export const markKitchenItemPrepared = createAsyncThunk(
+  'kitchen/markKitchenItemDone',
+  async (itemId, { dispatch, rejectWithValue }) => {
+    try {
+      await kitchenApi.markItemPrepared(itemId);
+      await dispatch(fetchKitchenOrders());
+      return itemId;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to mark item');
+    }
+  }
+);
+
 const kitchenSlice = createSlice({
   name: 'kitchen',
   initialState: {

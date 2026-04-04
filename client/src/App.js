@@ -15,6 +15,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import SelfOrderLayout from './components/selforder/SelfOrderLayout';
 
 // POS screens
+import TableCustomerScreen from './components/pos/TableCustomerScreen';
 import FloorPlan from './components/pos/FloorPlan';
 import OrderScreen from './components/pos/OrderScreen';
 import PaymentScreen from './components/pos/PaymentScreen';
@@ -34,9 +35,12 @@ import SessionManager from './components/admin/SessionManager';
 import ReportsDashboard from './components/admin/ReportsDashboard';
 import POSSettings from './components/admin/POSSettings';
 import StaffManagement from './components/admin/StaffManagement';
+import CustomerList from './components/admin/CustomerList';
+import AdminOrders from './components/admin/AdminOrders';
 
 // Self-ordering
 import SelfOrderMenu from './components/selforder/SelfOrderMenu';
+import SelfOrderProductDetail from './components/selforder/SelfOrderProductDetail';
 import SelfOrderStatus from './components/selforder/SelfOrderStatus';
 
 /**
@@ -65,8 +69,9 @@ function App() {
 
         {/* ── Self-Order (token-based, no auth) ─────────── */}
         <Route path="/order" element={<SelfOrderLayout />}>
-          <Route path=":token" element={<SelfOrderMenu />} />
           <Route path=":token/status" element={<SelfOrderStatus />} />
+          <Route path=":token/product/:productId" element={<SelfOrderProductDetail />} />
+          <Route path=":token" element={<SelfOrderMenu />} />
         </Route>
 
         {/* ── Customer Display (public) ─────────────────── */}
@@ -81,6 +86,8 @@ function App() {
             <Route path="/pos" element={<POSLayout />}>
               <Route index element={<Navigate to="floor" replace />} />
               <Route path="floor" element={<FloorPlan />} />
+              <Route path="table/:tableId/customer" element={<TableCustomerScreen />} />
+              <Route path="customers" element={<CustomerList />} />
               <Route path="order/:tableId" element={<OrderScreen />} />
               <Route path="payment/:orderId" element={<PaymentScreen />} />
             </Route>
@@ -95,6 +102,7 @@ function App() {
           <Route element={<RoleRoute allowedRoles={['admin']} />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
+              <Route path="orders" element={<AdminOrders />} />
               <Route path="products" element={<ProductList />} />
               <Route path="categories" element={<CategoryList />} />
               <Route path="floors" element={<FloorTableManagement />} />
@@ -102,6 +110,7 @@ function App() {
               <Route path="reports" element={<ReportsDashboard />} />
               <Route path="settings" element={<POSSettings />} />
               <Route path="staff" element={<StaffManagement />} />
+              <Route path="customers" element={<CustomerList />} />
             </Route>
           </Route>
         </Route>

@@ -23,9 +23,13 @@ const GenerateQRButton = ({ tableId, tableNumber }) => {
       const { data } = await selfOrderApi.generateToken({
         tableId,
         sessionId: session._id,
+        clientOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
       });
       setQrData(data);
       setOpen(true);
+      if (data.reused) {
+        toast.success('Same QR link — still valid until this table is cleared after payment.');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed');
     }
@@ -55,6 +59,11 @@ const GenerateQRButton = ({ tableId, tableNumber }) => {
                 <QRCodeSVG value={qrData.menuUrl} size={200} level="H" />
               </div>
               <Badge variant="outline" className="text-xs">{qrData.token}</Badge>
+              {qrData.reused && (
+                <p className="text-xs text-muted-foreground">
+                  Reused existing link — it stays the same until the table is free again.
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   readOnly
@@ -65,8 +74,12 @@ const GenerateQRButton = ({ tableId, tableNumber }) => {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Scan this QR to place orders directly from phone.
+              <p className="text-xs text-muted-foreground text-left leading-relaxed">
+                Scan with a phone on the same Wi‑Fi. Run the app with{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-[11px]">npm run start:lan</code> so the
+                network can reach this screen, then open POS at{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-[11px]">http://YOUR_PC_IP:3000</code> before
+                generating the QR (replace YOUR_PC_IP with this machine&apos;s LAN address).
               </p>
             </div>
           )}

@@ -1,21 +1,49 @@
+import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Table from '../models/Table.js';
+import Customer from '../models/Customer.js';
 import generateOrderNumber from '../utils/generateOrderNumber.js';
-import { releaseTableForOrder, allKitchenItemsComplete } from '../utils/releaseTable.js';
+import { releaseTableForOrder } from '../utils/releaseTable.js';
+
+/** Normalize id from JSON (string or { _id }) */
+function idString(id) {
+  if (id == null) return '';
+  if (typeof id === 'object' && id !== null && id._id != null) return String(id._id);
+  return String(id);
+}
+
+/** Stricter than Types.ObjectId.isValid (avoids false positives on some inputs) */
+function isValidObjectId(id) {
+  const s = idString(id);
+  return Boolean(s && mongoose.isValidObjectId(s));
+}
 
 export const getOrders = async (req, res) => {
   try {
-    const { status, table, session, limit = 50 } = req.query;
+    const { status, table, session, limit = '50' } = req.query;
     const filter = {};
     if (status) filter.status = status;
     if (table) filter.table = table;
     if (session) filter.session = session;
 
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 1000);
+
     const orders = await Order.find(filter)
-      .populate('table', 'tableNumber floor')
-      .populate('createdBy', 'first_name last_name')
+      .populate({
+        path: 'table',
+        select: 'tableNumber floor status',
+        populate: { path: 'floor', select: 'name' },
+      })
+      .populate('customer', 'name phone mobile email address city state country notes')
+      .populate('createdBy', 'first_name last_name email')
+      .populate('session', 'status openedAt closedAt openingBalance totalSales')
+      .populate({
+        path: 'items.product',
+        select: 'name price image unit category taxRate',
+        populate: { path: 'category', select: 'name' },
+      })
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
+      .limit(lim);
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch orders', error: err.message });
@@ -25,7 +53,12 @@ export const getOrders = async (req, res) => {
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('table', 'tableNumber floor')
+      .populate({
+        path: 'table',
+        select: 'tableNumber floor status',
+        populate: { path: 'floor', select: 'name' },
+      })
+      .populate('customer', 'name phone mobile email address city state country')
       .populate('createdBy', 'first_name last_name')
       .populate('items.product', 'name price image');
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -37,34 +70,78 @@ export const getOrderById = async (req, res) => {
 
 export const createOrder = async (req, res) => {
   try {
-    const { tableId, sessionId, items, notes, source = 'pos', selfOrderToken = '' } = req.body;
+    const {
+      tableId,
+      sessionId,
+      customerId,
+      customer: customerAlt,
+      items,
+      notes,
+      source = 'pos',
+      selfOrderToken = '',
+    } = req.body;
+
+    const resolvedCustomerId = idString(customerId || customerAlt);
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Order must include at least one line item' });
+    }
+
+    if (!tableId || !isValidObjectId(tableId)) {
+      return res.status(400).json({ message: 'Valid tableId is required' });
+    }
+
+    if (source === 'pos' && !resolvedCustomerId) {
+      return res.status(400).json({ message: 'Customer is required for POS orders' });
+    }
+    if (resolvedCustomerId) {
+      if (!isValidObjectId(resolvedCustomerId)) {
+        return res.status(400).json({ message: 'Invalid customer id' });
+      }
+      const exists = await Customer.findById(resolvedCustomerId);
+      if (!exists) return res.status(400).json({ message: 'Invalid customer' });
+    }
 
     const orderNumber = await generateOrderNumber();
 
-    // Calculate totals
     let subtotal = 0;
-    const orderItems = items.map((item) => {
-      const itemSubtotal = item.quantity * item.unitPrice;
+    const orderItems = [];
+    for (const item of items) {
+      const pid = item.productId ?? item.product;
+      if (!pid || !isValidObjectId(pid)) {
+        return res.status(400).json({
+          message: 'Each line item must include a valid productId',
+        });
+      }
+      const qty = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+      if (!Number.isFinite(qty) || qty < 1 || !Number.isFinite(unitPrice)) {
+        return res.status(400).json({ message: 'Invalid quantity or unitPrice on line item' });
+      }
+      const itemSubtotal = qty * unitPrice;
       subtotal += itemSubtotal;
-      return {
-        product: item.productId,
-        name: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
+      orderItems.push({
+        product: idString(pid),
+        name: String(item.name || 'Item'),
+        quantity: qty,
+        unitPrice,
         variant: item.variant || '',
         subtotal: itemSubtotal,
         kitchenStatus: 'pending',
-      };
-    });
+      });
+    }
 
     const taxRate = 5; // default
     const tax = parseFloat((subtotal * taxRate / 100).toFixed(2));
     const total = parseFloat((subtotal + tax).toFixed(2));
 
+    const sessionOid = sessionId && isValidObjectId(sessionId) ? idString(sessionId) : null;
+
     const order = await Order.create({
       orderNumber,
-      session: sessionId,
-      table: tableId,
+      session: sessionOid || undefined,
+      customer: resolvedCustomerId || null,
+      table: idString(tableId),
       createdBy: req.user?._id || null,
       items: orderItems,
       subtotal,
@@ -77,7 +154,7 @@ export const createOrder = async (req, res) => {
     });
 
     // Mark table as occupied
-    await Table.findByIdAndUpdate(tableId, {
+    await Table.findByIdAndUpdate(idString(tableId), {
       status: 'occupied',
       currentOrder: order._id,
     });
@@ -85,10 +162,30 @@ export const createOrder = async (req, res) => {
     const io = req.app.get('io');
     io.to('pos').emit('table:status_update', { tableId: String(tableId), status: 'occupied' });
 
-    const populated = await order.populate('table', 'tableNumber floor');
+    const populated = await order.populate([
+      { path: 'table', select: 'tableNumber floor' },
+      { path: 'customer', select: 'name phone mobile email address city state country' },
+    ]);
     res.status(201).json(populated);
   } catch (err) {
-    res.status(400).json({ message: 'Failed to create order', error: err.message });
+    console.error('createOrder', err?.name, err?.code, err?.message);
+    if (err?.name === 'ValidationError') {
+      return res.status(400).json({
+        message: 'Order validation failed',
+        error: err.message,
+        details: err.errors,
+      });
+    }
+    if (err?.code === 11000) {
+      return res.status(409).json({
+        message: 'Duplicate order number — please try again',
+        error: err.message,
+      });
+    }
+    res.status(400).json({
+      message: err?.message || 'Failed to create order',
+      error: err?.message,
+    });
   }
 };
 
@@ -106,7 +203,7 @@ export const updateOrder = async (req, res) => {
       order.items = items.map((item) => {
         const itemSubtotal = item.quantity * item.unitPrice;
         subtotal += itemSubtotal;
-        return {
+        const row = {
           product: item.productId || item.product,
           name: item.name,
           quantity: item.quantity,
@@ -115,6 +212,11 @@ export const updateOrder = async (req, res) => {
           subtotal: itemSubtotal,
           kitchenStatus: item.kitchenStatus || 'pending',
         };
+        const lineId = item.orderLineId ?? item._id;
+        if (lineId && isValidObjectId(lineId)) {
+          row._id = lineId;
+        }
+        return row;
       });
       const tax = parseFloat((subtotal * 5 / 100).toFixed(2));
       order.subtotal = subtotal;
@@ -147,6 +249,7 @@ export const sendToKitchen = async (req, res) => {
     const io = req.app.get('io');
     const orderPayload = order.toObject();
     io.to('kitchen').emit('order:new', orderPayload);
+    io.to('kitchen').emit('order:updated', orderPayload);
     io.to('customer').emit('customer:set_order', orderPayload);
     io.to('customer').emit('order:status_update', {
       orderId: order._id,
@@ -168,7 +271,7 @@ export const updateOrderStatus = async (req, res) => {
     const io = req.app.get('io');
     if (status === 'cancelled' && order.table) {
       await releaseTableForOrder(order, io);
-    } else if (status === 'paid' && order.table && allKitchenItemsComplete(order)) {
+    } else if (status === 'paid' && order.table) {
       await releaseTableForOrder(order, io);
     }
 
@@ -183,10 +286,10 @@ export const cancelOrder = async (req, res) => {
     const order = await Order.findByIdAndUpdate(req.params.id, { status: 'cancelled' }, { new: true });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    await Table.findByIdAndUpdate(order.table, { status: 'available', currentOrder: null });
-
     const io = req.app.get('io');
-    io.to('pos').emit('table:status_update', { tableId: String(order.table), status: 'available' });
+    if (order.table) {
+      await releaseTableForOrder(order, io);
+    }
 
     res.json({ message: 'Order cancelled', order });
   } catch (err) {

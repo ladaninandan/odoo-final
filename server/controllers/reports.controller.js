@@ -1,22 +1,63 @@
 import Order from '../models/Order.js';
 import { generatePDF, generateXLS } from '../utils/reportExport.js';
 
+/** Start of local calendar day */
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** Build last `days` UTC calendar days (oldest → newest); keys match Mongo $dateToString UTC buckets */
+function buildDayRangeUtc(numDays) {
+  const out = [];
+  const now = new Date();
+  const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  for (let i = numDays - 1; i >= 0; i--) {
+    const day = new Date(utcMidnight - i * 86400000);
+    const key = day.toISOString().slice(0, 10);
+    const label = new Intl.DateTimeFormat('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    }).format(day);
+    out.push({ key, label });
+  }
+  return out;
+}
+
 export const getDashboard = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const now = new Date();
+    const sevenDaysAgo = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0, 0)
+    );
 
-    const [totalSales, totalOrders, todaySales, todayOrders, topProducts] = await Promise.all([
+    const [
+      totalSales,
+      totalOrders,
+      todaySales,
+      todayOrders,
+      topProducts,
+      ordersByStatus,
+      todayActivity,
+      openPipelineTotal,
+      salesByDayAgg,
+    ] = await Promise.all([
       Order.aggregate([
         { $match: { status: 'paid' } },
         { $group: { _id: null, total: { $sum: '$total' } } },
       ]),
       Order.countDocuments({ status: 'paid' }),
       Order.aggregate([
-        { $match: { status: 'paid', createdAt: { $gte: today } } },
+        { $match: { status: 'paid', createdAt: { $gte: today, $lt: tomorrow } } },
         { $group: { _id: null, total: { $sum: '$total' } } },
       ]),
-      Order.countDocuments({ status: 'paid', createdAt: { $gte: today } }),
+      Order.countDocuments({ status: 'paid', createdAt: { $gte: today, $lt: tomorrow } }),
       Order.aggregate([
         { $match: { status: 'paid' } },
         { $unwind: '$items' },
@@ -31,7 +72,66 @@ export const getDashboard = async (req, res) => {
         { $limit: 10 },
         { $project: { name: '$_id', totalQty: 1, totalRevenue: 1, _id: 0 } },
       ]),
+      Order.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            status: { $nin: ['cancelled'] },
+            createdAt: { $gte: today, $lt: tomorrow },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            pipelineTotal: { $sum: '$total' },
+          },
+        },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            status: { $in: ['draft', 'sent_to_kitchen', 'ready'] },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            status: 'paid',
+            createdAt: { $gte: sevenDaysAgo },
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            sales: { $sum: '$total' },
+            orders: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
     ]);
+
+    const salesMap = Object.fromEntries(
+      salesByDayAgg.map((r) => [r._id, { sales: r.sales, orders: r.orders }])
+    );
+    const salesLast7Days = buildDayRangeUtc(7).map((d) => ({
+      date: d.key,
+      label: d.label,
+      sales: salesMap[d.key]?.sales || 0,
+      orders: salesMap[d.key]?.orders || 0,
+    }));
+
+    const statusCounts = Object.fromEntries(
+      (ordersByStatus || []).map((r) => [r._id, r.count])
+    );
+
+    const pipeline = todayActivity[0] || { count: 0, pipelineTotal: 0 };
+    const openOrders = openPipelineTotal[0] || { total: 0, count: 0 };
 
     res.json({
       totalSales: totalSales[0]?.total || 0,
@@ -40,6 +140,12 @@ export const getDashboard = async (req, res) => {
       todayOrders,
       topProducts,
       averageOrderValue: totalOrders ? (totalSales[0]?.total || 0) / totalOrders : 0,
+      ordersByStatus: statusCounts,
+      todayOrdersAllStatuses: pipeline.count,
+      todayPipelineTotal: pipeline.pipelineTotal || 0,
+      openOrdersCount: openOrders.count || 0,
+      openOrdersValue: openOrders.total || 0,
+      salesLast7Days,
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch dashboard', error: err.message });
