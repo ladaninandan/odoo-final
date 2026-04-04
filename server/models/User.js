@@ -14,7 +14,7 @@ const userSchema = mongoose.Schema(
 
     is_verified: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'suspended', 'archived'], default: 'active' },
-    role: { type: String, enum: ['user', 'admin', 'moderator'], default: 'user' },
+    role: { type: String, enum: ['admin', 'cashier', 'kitchen'], default: 'cashier' },
 
     last_login_at: { type: Date },
     last_login_ip: { type: String },
