@@ -8,6 +8,9 @@ export const getStatusLabel = (status) => {
     ready: 'Ready',
     paid: 'Paid',
     cancelled: 'Cancelled',
+    to_cook: 'To Cook',
+    preparing: 'Preparing',
+    completed: 'Completed',
   };
   return labels[status] || status;
 };

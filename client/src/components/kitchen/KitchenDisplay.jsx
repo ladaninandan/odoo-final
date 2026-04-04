@@ -1,7 +1,8 @@
 import React, { useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchKitchenOrders, advanceStage } from '../../store/slices/kitchenSlice';
-import useSocket from '../../hooks/useSocket';
+import useAuth from '../../hooks/useAuth';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -21,12 +22,12 @@ const stageConfig = {
 
 const KitchenDisplay = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const { orders, isLoading } = useSelector((state) => state.kitchen);
-  useSocket('kitchen');
-
   useEffect(() => {
     dispatch(fetchKitchenOrders());
-    const interval = setInterval(() => dispatch(fetchKitchenOrders()), 15000);
+    const interval = setInterval(() => dispatch(fetchKitchenOrders()), 3000);
     return () => clearInterval(interval);
   }, [dispatch]);
 
@@ -63,14 +64,26 @@ const KitchenDisplay = () => {
           <ChefHat className="h-6 w-6 text-primary" />
           <h1 className="text-lg font-bold">Kitchen Display</h1>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => dispatch(fetchKitchenOrders())}
-          className="gap-2"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => navigate('/pos/floor')}>
+                POS
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
+                Admin
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => dispatch(fetchKitchenOrders())}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 grid grid-cols-3 gap-4 p-4 overflow-hidden">

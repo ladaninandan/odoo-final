@@ -13,12 +13,13 @@ import {
 import {
   LayoutGrid, RefreshCw, Settings, LogOut, User, ChevronLeft,
 } from 'lucide-react';
+import PosStopSessionButton from '../pos/PosStopSessionButton';
 
 const TopMenu = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { activeTable } = useSelector((state) => state.cart);
   const { current: session } = useSelector((state) => state.session);
 
@@ -51,9 +52,12 @@ const TopMenu = () => {
           </Badge>
         )}
         {session && (
-          <Badge variant="success" className="text-xs">
-            Session Active
-          </Badge>
+          <>
+            <Badge variant="success" className="text-xs">
+              Session Active
+            </Badge>
+            <PosStopSessionButton variant="destructive" size="sm" />
+          </>
         )}
       </div>
 
@@ -64,9 +68,11 @@ const TopMenu = () => {
         <Button variant="ghost" size="icon" onClick={() => window.location.reload()} title="Reload">
           <RefreshCw className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} title="Backend">
-          <Settings className="h-4 w-4" />
-        </Button>
+        {isAdmin && (
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin')} title="Admin panel">
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -80,9 +86,13 @@ const TopMenu = () => {
               {user?.first_name} {user?.last_name}
               <p className="text-xs text-muted-foreground font-normal capitalize">{user?.role}</p>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/admin/sessions')}>Sessions</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/admin/settings')}>Settings</DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/admin/sessions')}>Sessions</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/admin/settings')}>Settings</DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" /> Logout

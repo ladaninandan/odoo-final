@@ -4,3 +4,4 @@ export { logoutUser } from './auth/logoutController.js';
 export { googleLogin } from './auth/googleController.js';
 export { requestOtp, verifyOtpAndResetPassword } from './auth/passwordController.js';
 export { refreshTokenFlow } from './auth/tokenController.js';
+export { getMe } from './auth/getMeController.js';

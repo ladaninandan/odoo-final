@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import Table from '../models/Table.js';
 import generateOrderNumber from '../utils/generateOrderNumber.js';
 import { setTableStatus, setOrderKitchenStage } from '../utils/redisCache.js';
+import { releaseTableForOrder, allKitchenItemsComplete } from '../utils/releaseTable.js';
 
 export const getOrders = async (req, res) => {
   try {
@@ -83,9 +84,8 @@ export const createOrder = async (req, res) => {
     });
     await setTableStatus(tableId, 'occupied');
 
-    // Emit table status update
     const io = req.app.get('io');
-    io.to('pos').emit('table:status_update', { tableId, status: 'occupied' });
+    io.to('pos').emit('table:status_update', { tableId: String(tableId), status: 'occupied' });
 
     const populated = await order.populate('table', 'tableNumber floor');
     res.status(201).json(populated);
@@ -148,9 +148,11 @@ export const sendToKitchen = async (req, res) => {
     // Cache kitchen stage
     await setOrderKitchenStage(order._id, 'to_cook');
 
-    // Emit to Kitchen Display
+    // Emit to Kitchen Display + Customer Display (full order for second screen)
     const io = req.app.get('io');
-    io.to('kitchen').emit('order:new', order.toObject());
+    const orderPayload = order.toObject();
+    io.to('kitchen').emit('order:new', orderPayload);
+    io.to('customer').emit('customer:set_order', orderPayload);
     io.to('customer').emit('order:status_update', {
       orderId: order._id,
       status: 'sent_to_kitchen',
@@ -168,13 +170,11 @@ export const updateOrderStatus = async (req, res) => {
     const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // If paid or cancelled, free the table
-    if (status === 'paid' || status === 'cancelled') {
-      await Table.findByIdAndUpdate(order.table, { status: 'available', currentOrder: null });
-      await setTableStatus(order.table, 'available');
-
-      const io = req.app.get('io');
-      io.to('pos').emit('table:status_update', { tableId: order.table, status: 'available' });
+    const io = req.app.get('io');
+    if (status === 'cancelled' && order.table) {
+      await releaseTableForOrder(order, io);
+    } else if (status === 'paid' && order.table && allKitchenItemsComplete(order)) {
+      await releaseTableForOrder(order, io);
     }
 
     res.json(order);
@@ -192,7 +192,7 @@ export const cancelOrder = async (req, res) => {
     await setTableStatus(order.table, 'available');
 
     const io = req.app.get('io');
-    io.to('pos').emit('table:status_update', { tableId: order.table, status: 'available' });
+    io.to('pos').emit('table:status_update', { tableId: String(order.table), status: 'available' });
 
     res.json({ message: 'Order cancelled', order });
   } catch (err) {

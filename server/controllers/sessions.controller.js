@@ -61,6 +61,11 @@ export const closeSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.id);
     if (!session) return res.status(404).json({ message: 'Session not found' });
+    const isOwner = session.openedBy?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You can only close your own session' });
+    }
     if (session.status === 'closed') {
       return res.status(400).json({ message: 'Session is already closed' });
     }

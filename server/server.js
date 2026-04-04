@@ -20,6 +20,7 @@ import paymentsRoutes from './routes/payments.routes.js';
 import sessionsRoutes from './routes/sessions.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import selfOrderRoutes from './routes/selfOrder.routes.js';
+import usersRoutes from './routes/users.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorMiddleware.js';
 import registerSocketHandlers from './socket/socketHandlers.js';
 
@@ -83,6 +84,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/self-order', selfOrderRoutes);
+app.use('/api/users', usersRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

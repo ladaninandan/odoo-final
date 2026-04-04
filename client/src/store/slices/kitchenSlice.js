@@ -19,7 +19,15 @@ const kitchenSlice = createSlice({
   },
   reducers: {
     setConnected: (state, { payload }) => { state.isConnected = payload; },
-    addOrder: (state, { payload }) => { state.orders.to_cook.push(payload); },
+    addOrder: (state, { payload }) => {
+      if (!payload?._id) return;
+      const id = String(payload._id);
+      const cols = ['to_cook', 'preparing', 'completed'];
+      for (const col of cols) {
+        if (state.orders[col]?.some((o) => String(o._id) === id)) return;
+      }
+      state.orders.to_cook.push(payload);
+    },
     updateStage: (state, { payload }) => {
       const { orderId, stage } = payload;
       // Remove from all columns

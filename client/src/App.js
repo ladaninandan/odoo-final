@@ -6,6 +6,7 @@ import Register from './features/auth/Register';
 import ForgotPassword from './features/auth/ForgotPassword';
 import ProtectedRoute from './routes/ProtectedRoute';
 import PublicRoute from './routes/PublicRoute';
+import RoleRoute from './routes/RoleRoute';
 import NotFound from './pages/NotFound';
 
 // Layouts
@@ -32,6 +33,7 @@ import FloorTableManagement from './components/admin/FloorTableManagement';
 import SessionManager from './components/admin/SessionManager';
 import ReportsDashboard from './components/admin/ReportsDashboard';
 import POSSettings from './components/admin/POSSettings';
+import StaffManagement from './components/admin/StaffManagement';
 
 // Self-ordering
 import SelfOrderMenu from './components/selforder/SelfOrderMenu';
@@ -44,7 +46,8 @@ const RoleRedirect = () => {
   const { user } = useSelector((state) => state.auth);
   const role = user?.role;
   if (role === 'kitchen') return <Navigate to="/kitchen" replace />;
-  if (role === 'admin' || role === 'cashier') return <Navigate to="/pos/floor" replace />;
+  if (role === 'cashier') return <Navigate to="/pos/floor" replace />;
+  if (role === 'admin') return <Navigate to="/admin" replace />;
   // Unknown role — force re-login
   return <Navigate to="/login" replace />;
 };
@@ -71,30 +74,36 @@ function App() {
 
         {/* ── All Protected Routes ──────────────────────── */}
         <Route element={<ProtectedRoute />}>
-          {/* POS Terminal — admin & cashier */}
-          <Route path="/pos" element={<POSLayout />}>
-            <Route index element={<Navigate to="floor" replace />} />
-            <Route path="floor" element={<FloorPlan />} />
-            <Route path="order/:tableId" element={<OrderScreen />} />
-            <Route path="payment/:orderId" element={<PaymentScreen />} />
-          </Route>
-
-          {/* Kitchen Display — admin & kitchen staff */}
-          <Route path="/kitchen" element={<KitchenDisplay />} />
-
-          {/* Admin Panel — admin only */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="products" element={<ProductList />} />
-            <Route path="categories" element={<CategoryList />} />
-            <Route path="floors" element={<FloorTableManagement />} />
-            <Route path="sessions" element={<SessionManager />} />
-            <Route path="reports" element={<ReportsDashboard />} />
-            <Route path="settings" element={<POSSettings />} />
-          </Route>
-
-          {/* Default: redirect based on role */}
           <Route path="/" element={<RoleRedirect />} />
+
+          {/* POS — admin & cashier */}
+          <Route element={<RoleRoute allowedRoles={['admin', 'cashier']} />}>
+            <Route path="/pos" element={<POSLayout />}>
+              <Route index element={<Navigate to="floor" replace />} />
+              <Route path="floor" element={<FloorPlan />} />
+              <Route path="order/:tableId" element={<OrderScreen />} />
+              <Route path="payment/:orderId" element={<PaymentScreen />} />
+            </Route>
+          </Route>
+
+          {/* Kitchen — admin & kitchen */}
+          <Route element={<RoleRoute allowedRoles={['admin', 'kitchen']} />}>
+            <Route path="/kitchen" element={<KitchenDisplay />} />
+          </Route>
+
+          {/* Admin back-office — admin only */}
+          <Route element={<RoleRoute allowedRoles={['admin']} />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<ProductList />} />
+              <Route path="categories" element={<CategoryList />} />
+              <Route path="floors" element={<FloorTableManagement />} />
+              <Route path="sessions" element={<SessionManager />} />
+              <Route path="reports" element={<ReportsDashboard />} />
+              <Route path="settings" element={<POSSettings />} />
+              <Route path="staff" element={<StaffManagement />} />
+            </Route>
+          </Route>
         </Route>
 
         {/* ── 404 ──────────────────────────────────────── */}

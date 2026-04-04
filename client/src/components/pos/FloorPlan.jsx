@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { fetchFloors, selectFloor } from '../../store/slices/floorsSlice';
 import { setActiveTable } from '../../store/slices/cartSlice';
 import { fetchCurrentSession, openSession } from '../../store/slices/sessionSlice';
+import { formatCurrency } from '../../utils/formatCurrency';
+import PosStopSessionButton from './PosStopSessionButton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -13,6 +15,7 @@ import { cn } from '../../lib/utils';
 import { getTableStatusColor } from '../../utils/orderHelpers';
 import { Users, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import GenerateQRButton from '../selforder/GenerateQRButton';
 
 const FloorPlan = () => {
   const dispatch = useDispatch();
@@ -23,6 +26,17 @@ const FloorPlan = () => {
   useEffect(() => {
     dispatch(fetchFloors());
     dispatch(fetchCurrentSession());
+  }, [dispatch]);
+
+  /** Backup sync — socket can still miss events; keeps table occupied/available accurate */
+  useEffect(() => {
+    const id = setInterval(() => dispatch(fetchFloors()), 4000);
+    const onFocus = () => dispatch(fetchFloors());
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [dispatch]);
 
   const handleTableClick = (table) => {
@@ -65,6 +79,21 @@ const FloorPlan = () => {
           <Button size="sm" variant="warning" onClick={handleOpenSession}>
             Open Session
           </Button>
+        </div>
+      )}
+
+      {session && (
+        <div className="bg-green-500/10 border-b border-green-500/30 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-3 text-sm">
+            <Badge variant="success" className="text-xs">
+              Till open
+            </Badge>
+            <span className="text-muted-foreground">
+              Sales this session:{' '}
+              <span className="font-semibold text-foreground">{formatCurrency(session.totalSales ?? 0)}</span>
+            </span>
+          </div>
+          <PosStopSessionButton variant="outline" size="sm" label="Stop session" />
         </div>
       )}
 
@@ -123,6 +152,14 @@ const FloorPlan = () => {
                       <p className="text-[10px] mt-1 opacity-60 truncate">
                         {table.currentOrder.orderNumber}
                       </p>
+                    )}
+                    {session && (
+                      <div
+                        className="mt-2 flex justify-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <GenerateQRButton tableId={table._id} tableNumber={table.tableNumber} />
+                      </div>
                     )}
                   </div>
                 </Card>

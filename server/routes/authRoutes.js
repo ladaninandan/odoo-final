@@ -7,6 +7,7 @@ import {
   requestOtp,
   verifyOtpAndResetPassword,
   refreshTokenFlow,
+  getMe,
 } from '../controllers/authController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
@@ -23,5 +24,7 @@ router.post('/reset-password', verifyOtpAndResetPassword);
 
 // Token Refresh Flow
 router.post('/refresh', refreshTokenFlow);
+
+router.get('/me', protect, getMe);
 
 export default router;

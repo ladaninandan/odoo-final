@@ -1,10 +1,9 @@
 import Payment from '../models/Payment.js';
 import PaymentMethod from '../models/PaymentMethod.js';
 import Order from '../models/Order.js';
-import Table from '../models/Table.js';
 import Session from '../models/Session.js';
 import generateUPIQR from '../utils/generateQR.js';
-import { setTableStatus } from '../utils/redisCache.js';
+import { releaseTableForOrder, allKitchenItemsComplete } from '../utils/releaseTable.js';
 
 export const initiatePayment = async (req, res) => {
   try {
@@ -47,14 +46,8 @@ export const confirmPayment = async (req, res) => {
     );
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
 
-    // Mark order as paid
     const order = await Order.findByIdAndUpdate(payment.order, { status: 'paid' }, { new: true });
-
-    // Free the table
-    if (order?.table) {
-      await Table.findByIdAndUpdate(order.table, { status: 'available', currentOrder: null });
-      await setTableStatus(order.table, 'available');
-    }
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
     // Update session total sales
     if (payment.session) {
@@ -63,12 +56,13 @@ export const confirmPayment = async (req, res) => {
       });
     }
 
-    // Emit socket events
     const io = req.app.get('io');
     io.to('pos').emit('payment:confirmed', { orderId: payment.order, paymentId: payment._id });
     io.to('customer').emit('payment:confirmed', { orderId: payment.order });
-    if (order?.table) {
-      io.to('pos').emit('table:status_update', { tableId: order.table, status: 'available' });
+
+    // Free table only if kitchen already finished all items — otherwise stay occupied until kitchen completes
+    if (order.table && allKitchenItemsComplete(order)) {
+      await releaseTableForOrder(order, io);
     }
 
     res.json(payment);

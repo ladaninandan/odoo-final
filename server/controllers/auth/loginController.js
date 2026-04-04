@@ -29,6 +29,10 @@ export const loginUser = async (req, res) => {
   }
 
   if (user && (await user.matchPassword(password))) {
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active. Contact an administrator.' });
+    }
+
     const sessionId = new mongoose.Types.ObjectId();
     const { accessToken, refreshToken } = generateTokens(user._id, sessionId);
 
@@ -66,7 +70,10 @@ export const loginUser = async (req, res) => {
     res.json({
       _id: user._id,
       name: user.first_name,
+      first_name: user.first_name,
+      last_name: user.last_name || '',
       email: user.email,
+      role: user.role,
       accessToken,
     });
   } else {

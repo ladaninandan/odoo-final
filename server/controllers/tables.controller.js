@@ -52,7 +52,7 @@ export const updateTableStatus = async (req, res) => {
 
     // Emit socket event
     const io = req.app.get('io');
-    io.to('pos').emit('table:status_update', { tableId: table._id, status });
+    io.to('pos').emit('table:status_update', { tableId: String(table._id), status });
 
     res.json(table);
   } catch (err) {

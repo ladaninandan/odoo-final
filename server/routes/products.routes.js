@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { getProducts, getProductById, createProduct, updateProduct, deleteProduct } from '../controllers/products.controller.js';
 import { protect } from '../middlewares/authMiddleware.js';
+import { authorizeRoles } from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
@@ -31,8 +32,8 @@ router.use(protect);
 
 router.get('/', getProducts);
 router.get('/:id', getProductById);
-router.post('/', upload.single('image'), createProduct);
-router.put('/:id', upload.single('image'), updateProduct);
-router.delete('/:id', deleteProduct);
+router.post('/', authorizeRoles('admin'), upload.single('image'), createProduct);
+router.put('/:id', authorizeRoles('admin'), upload.single('image'), updateProduct);
+router.delete('/:id', authorizeRoles('admin'), deleteProduct);
 
 export default router;

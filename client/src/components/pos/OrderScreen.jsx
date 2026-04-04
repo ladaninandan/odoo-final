@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts, fetchCategories } from '../../store/slices/productsSlice';
 import { addItem, removeItem, updateQuantity, clearCart, setActiveTable } from '../../store/slices/cartSlice';
 import { createOrder, sendToKitchen } from '../../store/slices/ordersSlice';
+import { fetchFloors, updateTableStatus } from '../../store/slices/floorsSlice';
 import tablesApi from '../../api/tablesApi';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -39,7 +40,7 @@ const OrderScreen = () => {
     const loadTable = async () => {
       try {
         const { data } = await tablesApi.getAll({ floor: '' });
-        const table = data.find((t) => t._id === tableId);
+        const table = data.find((t) => String(t._id) === String(tableId));
         if (table) dispatch(setActiveTable(table));
       } catch {}
     };
@@ -78,9 +79,14 @@ const OrderScreen = () => {
       const order = await dispatch(createOrder(orderData)).unwrap();
       toast.success(`Order ${order.orderNumber} created!`);
 
+      const tableRef = order.table?._id ?? order.table ?? tableId;
+      dispatch(updateTableStatus({ tableId: tableRef, status: 'occupied' }));
+
       // Auto-send to kitchen
       await dispatch(sendToKitchen(order._id)).unwrap();
       toast.success('Sent to kitchen!');
+
+      dispatch(fetchFloors());
       navigate(`/pos/payment/${order._id}`);
     } catch (err) {
       toast.error(err || 'Failed to create order');

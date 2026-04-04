@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import useSocket from '../../hooks/useSocket';
+import useCustomerDisplaySocket from '../../hooks/useCustomerDisplaySocket';
 import { Badge } from '../ui/Badge';
 import { Card, CardContent } from '../ui/Card';
 import { Separator } from '../ui/Separator';
@@ -16,7 +16,7 @@ const statusIcons = {
 };
 
 const CustomerDisplay = () => {
-  useSocket('customer');
+  useCustomerDisplaySocket();
   const { currentOrder, paymentStatus } = useSelector((state) => state.customerDisplay);
   const [time, setTime] = useState(new Date());
 

@@ -1,18 +1,35 @@
 import Order from '../models/Order.js';
 import { setOrderKitchenStage } from '../utils/redisCache.js';
+import { releaseTableForOrder } from '../utils/releaseTable.js';
 
 const STAGE_FLOW = {
   to_cook: 'preparing',
   preparing: 'completed',
 };
 
+/**
+ * Active kitchen queue: in-flight meals.
+ * Include `paid` when payment was taken before/at kitchen (common cashier flow) — those orders
+ * must still appear until all items are kitchen-completed (otherwise they vanished from this list).
+ */
 export const getActiveKitchenOrders = async (req, res) => {
   try {
-    const orders = await Order.find({
-      status: { $in: ['sent_to_kitchen', 'ready'] },
+    const raw = await Order.find({
+      status: { $in: ['sent_to_kitchen', 'ready', 'paid'] },
     })
       .populate('table', 'tableNumber')
       .sort({ createdAt: 1 });
+
+    const orders = raw.filter((order) => {
+      const allItemsDone = order.items.every((i) => i.kitchenStatus === 'completed');
+      if (['sent_to_kitchen', 'ready'].includes(order.status)) {
+        return true;
+      }
+      if (order.status === 'paid') {
+        return !allItemsDone;
+      }
+      return false;
+    });
 
     // Group by stage
     const grouped = {
@@ -73,6 +90,10 @@ export const advanceOrderStage = async (req, res) => {
     io.to('pos').emit('kitchen:stage_update', { orderId: order._id, stage: newStage || 'completed' });
     io.to('customer').emit('order:status_update', { orderId: order._id, status: allCompleted ? 'ready' : newStage });
 
+    if (allCompleted && order.table) {
+      await releaseTableForOrder(order, io);
+    }
+
     res.json(order);
   } catch (err) {
     res.status(400).json({ message: 'Failed to advance order stage', error: err.message });
@@ -100,6 +121,10 @@ export const markItemPrepared = async (req, res) => {
 
     const io = req.app.get('io');
     io.to('pos').emit('order:item_prepared', { orderId: order._id, itemId });
+
+    if (allCompleted && order.table) {
+      await releaseTableForOrder(order, io);
+    }
 
     res.json(order);
   } catch (err) {

@@ -36,9 +36,17 @@ export const useLogin = () => {
     try {
       const payload = identifier.includes('@') ? { email: identifier, password } : { phone: identifier, password };
       const res = await authApi.login(payload);
-      dispatch(loginSuccess({ 
-        user: { id: res.data._id, name: res.data.name, email: res.data.email }, 
-        accessToken: res.data.accessToken 
+      const u = res.data;
+      dispatch(loginSuccess({
+        user: {
+          id: u._id,
+          first_name: u.first_name ?? u.name,
+          last_name: u.last_name ?? '',
+          name: u.name ?? u.first_name,
+          email: u.email,
+          role: u.role,
+        },
+        accessToken: u.accessToken,
       }));
       navigate('/');
     } catch (err) {
@@ -52,9 +60,17 @@ export const useLogin = () => {
     onSuccess: async (codeResponse) => {
       try {
         const res = await authApi.googleLogin({ code: codeResponse.code });
-        dispatch(loginSuccess({ 
-          user: { id: res.data._id, name: res.data.name, email: res.data.email }, 
-          accessToken: res.data.accessToken 
+        const u = res.data;
+        dispatch(loginSuccess({
+          user: {
+            id: u._id,
+            first_name: u.first_name ?? u.name,
+            last_name: u.last_name ?? '',
+            name: u.name ?? u.first_name,
+            email: u.email,
+            role: u.role,
+          },
+          accessToken: u.accessToken,
         }));
         navigate('/');
       } catch (err) {

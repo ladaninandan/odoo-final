@@ -13,9 +13,13 @@ const floorsSlice = createSlice({
     selectFloor: (state, { payload }) => { state.selectedFloor = payload; },
     updateTableStatus: (state, { payload }) => {
       const { tableId, status } = payload;
+      const id = tableId != null ? String(tableId) : '';
       state.list.forEach((floor) => {
-        const table = floor.tables?.find((t) => t._id === tableId);
+        const table = floor.tables?.find((t) => String(t._id) === id);
         if (table) table.status = status;
+        if (status === 'available' && table) {
+          table.currentOrder = null;
+        }
       });
     },
   },

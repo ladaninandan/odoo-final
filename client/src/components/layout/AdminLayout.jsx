@@ -7,8 +7,8 @@ import useAuth from '../../hooks/useAuth';
 import { Toaster } from '../ui/Toaster';
 import { cn } from '../../lib/utils';
 import {
-  LayoutDashboard, Package, Grid3X3, Armchair, CreditCard,
-  Clock, BarChart3, Settings, LogOut, ChevronLeft,
+  LayoutDashboard, Package, Grid3X3, Armchair,
+  Clock, BarChart3, Settings, LogOut, ChevronLeft, Users,
 } from 'lucide-react';
 
 const navItems = [
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/admin/floors', icon: Armchair, label: 'Floors & Tables' },
   { to: '/admin/sessions', icon: Clock, label: 'Sessions' },
   { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/admin/staff', icon: Users, label: 'Staff' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 

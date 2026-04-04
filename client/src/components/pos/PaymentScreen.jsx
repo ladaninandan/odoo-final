@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { initiatePayment, confirmPayment, selectMethod, resetPayment } from '../../store/slices/paymentSlice';
 import { clearCart } from '../../store/slices/cartSlice';
+import { fetchFloors } from '../../store/slices/floorsSlice';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -55,6 +56,7 @@ const PaymentScreen = () => {
       toast.success('Payment confirmed! 🎉');
       dispatch(clearCart());
       dispatch(resetPayment());
+      dispatch(fetchFloors());
       setTimeout(() => navigate('/pos/floor'), 1500);
     } catch (err) {
       toast.error(err || 'Payment failed');
@@ -71,6 +73,7 @@ const PaymentScreen = () => {
       toast.success('UPI Payment confirmed! 🎉');
       dispatch(clearCart());
       dispatch(resetPayment());
+      dispatch(fetchFloors());
       setTimeout(() => navigate('/pos/floor'), 1500);
     } catch (err) {
       toast.error(err || 'Confirmation failed');

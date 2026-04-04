@@ -8,9 +8,9 @@ const PublicRoute = () => {
   
   if (!isAuthenticated) return <Outlet />;
 
-  // Redirect authenticated users to their home screen
   if (role === 'kitchen') return <Navigate to="/kitchen" replace />;
-  if (role === 'admin' || role === 'cashier') return <Navigate to="/pos/floor" replace />;
+  if (role === 'cashier') return <Navigate to="/pos/floor" replace />;
+  if (role === 'admin') return <Navigate to="/admin" replace />;
   
   // Unknown role — let them through (login) so they can re-authenticate
   return <Outlet />;

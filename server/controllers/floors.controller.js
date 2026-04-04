@@ -7,7 +7,9 @@ export const getFloors = async (req, res) => {
     // Attach tables to each floor
     const floorsWithTables = await Promise.all(
       floors.map(async (floor) => {
-        const tables = await Table.find({ floor: floor._id, isActive: true }).sort({ tableNumber: 1 });
+        const tables = await Table.find({ floor: floor._id, isActive: true })
+          .populate('currentOrder', 'orderNumber status total')
+          .sort({ tableNumber: 1 });
         return { ...floor.toObject(), tables };
       })
     );
