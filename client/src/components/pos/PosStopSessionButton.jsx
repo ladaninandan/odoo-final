@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { closeSession } from '../../store/slices/sessionSlice';
+import { closeSession, fetchCurrentSession } from '../../store/slices/sessionSlice';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Label } from '../ui/Label';
@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../ui/Dialog';
-import { StopCircle, Loader2 } from 'lucide-react';
+import { StopCircle, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
@@ -25,9 +25,27 @@ const PosStopSessionButton = ({ variant = 'outline', size = 'sm', className = ''
   const [closingBalance, setClosingBalance] = useState('');
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (!session?._id) return undefined;
+    const id = setInterval(() => {
+      dispatch(fetchCurrentSession());
+    }, 8000);
+    return () => clearInterval(id);
+  }, [dispatch, session?._id]);
+
+  const pendingOrdersCount = Number(session?.pendingOrdersCount ?? 0);
+  const canCloseSession = useMemo(
+    () => session?.canCloseSession !== false && pendingOrdersCount === 0,
+    [session?.canCloseSession, pendingOrdersCount]
+  );
+
   if (!session) return null;
 
   const handleClose = async () => {
+    if (!canCloseSession) {
+      toast.error('Finish payment for all open orders (or cancel them) before stopping the session.');
+      return;
+    }
     setSaving(true);
     try {
       await dispatch(
@@ -40,7 +58,7 @@ const PosStopSessionButton = ({ variant = 'outline', size = 'sm', className = ''
       setClosingBalance('');
       setOpen(false);
     } catch (err) {
-      toast.error(err || 'Could not stop session');
+      toast.error(typeof err === 'string' ? err : err?.message || 'Could not stop session');
     }
     setSaving(false);
   };
@@ -52,7 +70,15 @@ const PosStopSessionButton = ({ variant = 'outline', size = 'sm', className = ''
         variant={variant}
         size={size}
         className={`gap-1.5 ${className}`}
-        onClick={() => setOpen(true)}
+        title={
+          canCloseSession
+            ? 'Stop till session'
+            : 'Complete payment for all orders on this till first'
+        }
+        onClick={() => {
+          dispatch(fetchCurrentSession());
+          setOpen(true);
+        }}
       >
         <StopCircle className="h-4 w-4" />
         {label}
@@ -66,6 +92,16 @@ const PosStopSessionButton = ({ variant = 'outline', size = 'sm', className = ''
             terminals.
           </DialogDescription>
         </DialogHeader>
+        {!canCloseSession ? (
+          <div className="flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p>
+              {pendingOrdersCount > 0
+                ? `${pendingOrdersCount} order(s) still need payment or must be cancelled. Finish them before stopping the session.`
+                : 'Complete payment for every order on this till before stopping the session.'}
+            </p>
+          </div>
+        ) : null}
         <div className="space-y-2 py-2">
           <Label htmlFor="pos-closing-balance">Closing cash balance</Label>
           <Input
@@ -83,7 +119,13 @@ const PosStopSessionButton = ({ variant = 'outline', size = 'sm', className = ''
           <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={handleClose} disabled={saving} className="gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleClose}
+            disabled={saving || !canCloseSession}
+            className="gap-2"
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />}
             Confirm stop
           </Button>

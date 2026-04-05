@@ -12,8 +12,13 @@ export const openSession = createAsyncThunk('session/open', async (data, { rejec
 });
 
 export const closeSession = createAsyncThunk('session/close', async ({ id, closingBalance }, { rejectWithValue }) => {
-  try { const res = await sessionsApi.close(id, { closingBalance }); return res.data; }
-  catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to close'); }
+  try {
+    const res = await sessionsApi.close(id, { closingBalance });
+    return res.data;
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message || 'Failed to close';
+    return rejectWithValue(msg);
+  }
 });
 
 const sessionSlice = createSlice({

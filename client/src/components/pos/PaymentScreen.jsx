@@ -12,6 +12,7 @@ import { clearCart } from '../../store/slices/cartSlice';
 import { setCurrentOrder } from '../../store/slices/ordersSlice';
 import { fetchFloors } from '../../store/slices/floorsSlice';
 import ordersApi from '../../api/ordersApi';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -279,6 +280,7 @@ const PaymentScreen = () => {
             )}
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
+            <ScrollReveal>
             <div className="rounded-md border overflow-x-auto">
               {lineRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground p-4 text-center">No line items on this order.</p>
@@ -327,6 +329,7 @@ const PaymentScreen = () => {
                 </table>
               )}
             </div>
+            </ScrollReveal>
 
             <Separator />
 

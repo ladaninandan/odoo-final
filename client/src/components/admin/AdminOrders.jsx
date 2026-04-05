@@ -5,15 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '../ui/Table';
-import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '../ui/Select';
 import { Skeleton } from '../ui/Skeleton';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { getStatusLabel, getKitchenStageLabel, getStatusVariant } from '../../utils/orderHelpers';
 import { cn } from '../../lib/utils';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import {
   RefreshCw,
   ChevronDown,
@@ -52,6 +50,7 @@ function formatDateTime(iso) {
 function OrderDetailsPanel({ order, floorName, tableNum, id }) {
   return (
     <div className="space-y-5">
+      <ScrollReveal>
       <div className="rounded-xl border bg-muted/20 p-1 overflow-hidden">
         <div className="overflow-x-auto rounded-lg">
           <table className="w-full min-w-[640px] text-sm">
@@ -100,6 +99,7 @@ function OrderDetailsPanel({ order, floorName, tableNum, id }) {
           </table>
         </div>
       </div>
+      </ScrollReveal>
 
       <div className="flex flex-wrap items-center justify-end gap-4 rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm">
         <span className="text-muted-foreground">
@@ -359,6 +359,7 @@ const AdminOrders = () => {
               <p className="text-sm text-muted-foreground/80">Try another status or clear your search</p>
             </div>
           ) : (
+            <ScrollReveal>
             <>
               {/* Desktop / tablet table */}
               <div className="hidden md:block">
@@ -523,6 +524,7 @@ const AdminOrders = () => {
                 })}
               </div>
             </>
+            </ScrollReveal>
           )}
 
           {!loading && filtered.length > 0 && (

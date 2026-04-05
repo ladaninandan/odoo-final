@@ -16,6 +16,7 @@ import {
   TableHead,
   TableCell,
 } from '../ui/Table';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { cn } from '../../lib/utils';
 import {
@@ -30,6 +31,7 @@ import {
   TrendingUp,
   Lock,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -64,6 +66,14 @@ const SessionManager = () => {
     loadAllSessions();
   }, [dispatch]);
 
+  useEffect(() => {
+    if (!current?._id) return undefined;
+    const id = setInterval(() => {
+      dispatch(fetchCurrentSession());
+    }, 8000);
+    return () => clearInterval(id);
+  }, [dispatch, current?._id]);
+
   const loadAllSessions = async () => {
     setLoadingSessions(true);
     try {
@@ -88,8 +98,16 @@ const SessionManager = () => {
     }
   };
 
+  const pendingOrdersCount = Number(current?.pendingOrdersCount ?? 0);
+  const canCloseSession =
+    current?.canCloseSession !== false && pendingOrdersCount === 0;
+
   const handleClose = async () => {
     if (!current?._id) return;
+    if (!canCloseSession) {
+      toast.error('Finish payment for all open orders (or cancel them) before closing the session.');
+      return;
+    }
     try {
       await dispatch(
         closeSession({
@@ -182,6 +200,20 @@ const SessionManager = () => {
 
             <Separator />
 
+            {!canCloseSession ? (
+              <div className="flex gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="font-medium">Open orders still on this till</p>
+                  <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+                    {pendingOrdersCount > 0
+                      ? `${pendingOrdersCount} order(s) still need payment or must be cancelled. Complete them before closing the session.`
+                      : 'Complete payment for every order linked to this session before closing.'}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             <div className="space-y-3 max-w-3xl">
               <Label htmlFor="closingBalance" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Closing cash count
@@ -202,6 +234,12 @@ const SessionManager = () => {
                   variant="destructive"
                   size="lg"
                   className="gap-2 rounded-xl h-11 w-full sm:w-auto shrink-0 px-6"
+                  disabled={!canCloseSession}
+                  title={
+                    canCloseSession
+                      ? 'Close till session'
+                      : 'Close all open orders (paid or cancelled) first'
+                  }
                   onClick={handleClose}
                 >
                   <StopCircle className="h-5 w-5" />
@@ -257,6 +295,7 @@ const SessionManager = () => {
 
       {/* History — full bleed */}
       <div className="">
+        <ScrollReveal>
         <Card className="overflow-hidden rounded-none border-x-0 border-border/80 shadow-md sm:rounded-lg sm:border-x">
           <CardHeader className="border-b border-border/60 bg-gradient-to-br from-muted/40 via-card to-card px-4 py-4 sm:px-5">
             <div className="flex items-center gap-3">
@@ -370,6 +409,7 @@ const SessionManager = () => {
             </div>
           </CardContent>
         </Card>
+        </ScrollReveal>
       </div>
     </div>
   );

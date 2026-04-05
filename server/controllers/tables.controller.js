@@ -65,8 +65,14 @@ export const updateTableStatus = async (req, res) => {
 
 export const deleteTable = async (req, res) => {
   try {
-    const table = await Table.findByIdAndDelete(req.params.id);
+    const table = await Table.findById(req.params.id);
     if (!table) return res.status(404).json({ message: 'Table not found' });
+    if (table.status !== 'available') {
+      return res.status(409).json({
+        message: 'Only tables that are available (not occupied or reserved) can be deleted.',
+      });
+    }
+    await Table.findByIdAndDelete(req.params.id);
     res.json({ message: 'Table deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to delete table', error: err.message });

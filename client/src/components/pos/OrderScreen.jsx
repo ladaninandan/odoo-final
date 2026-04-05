@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts, fetchCategories } from '../../store/slices/productsSlice';
 import {
+  cartSlice,
   addItem,
   removeItem,
   updateQuantity,
@@ -22,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Separator } from '../ui/Separator';
 import { Skeleton } from '../ui/Skeleton';
 import { cn } from '../../lib/utils';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { getKitchenStageLabel } from '../../utils/orderHelpers';
 import {
@@ -253,12 +255,12 @@ const OrderScreen = () => {
     const t = setInterval(async () => {
       try {
         const { data } = await ordersApi.getById(activeOrder);
-        dispatch(loadExistingOrder(data));
+        dispatch(cartSlice.actions.mergeServerOrderIntoCart(data));
         dispatch(setCurrentOrder(data));
       } catch {
         /* ignore */
       }
-    }, 4000);
+    }, 5000);
     return () => clearInterval(t);
   }, [activeOrder, canPayNow, dispatch]);
 
@@ -292,6 +294,7 @@ const OrderScreen = () => {
     <div className="h-full min-h-0 flex flex-col bg-muted/25">
       {/* Table & order context */}
       <header className="shrink-0 border-b border-border bg-card/95 backdrop-blur-sm shadow-sm">
+        <ScrollReveal className="w-full">
         <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-4 min-w-0">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-lg font-bold shadow-md ring-2 ring-primary/20">
@@ -334,12 +337,14 @@ const OrderScreen = () => {
             )}
           </div>
         </div>
+        </ScrollReveal>
       </header>
 
       <div className="flex-1 flex min-h-0 min-w-0">
         {/* Menu */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="shrink-0 p-4 sm:p-5 pb-2 space-y-4 ">
+            <ScrollReveal>
             <Card className="border-border/80 shadow-sm overflow-hidden">
               <CardContent className="p-4 space-y-4">
                 <div className="relative">
@@ -387,6 +392,7 @@ const OrderScreen = () => {
                 </div>
               </CardContent>
             </Card>
+            </ScrollReveal>
           </div>
 
           <div className="flex-1 overflow-auto px-4 sm:px-5 pb-6">
@@ -398,7 +404,7 @@ const OrderScreen = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 mt-3">
-                {filteredProducts.map((product) => {
+                {filteredProducts.map((product, cardIndex) => {
                   const linesForProduct = items.filter((i) => i.productId === product._id);
                   const unlockedQty = linesForProduct
                     .filter((i) => !i.locked)
@@ -409,8 +415,8 @@ const OrderScreen = () => {
                   const highlightNew = unlockedQty > 0;
                   const highlightSentOnly = unlockedQty === 0 && lockedQty > 0;
                   return (
+                    <ScrollReveal key={product._id} delay={Math.min(cardIndex, 20) * 32}>
                     <Card
-                      key={product._id}
                       onClick={() => handleAddItem(product)}
                       className={cn(
                         'group cursor-pointer overflow-hidden rounded-2xl border-border/70 shadow-sm transition-all duration-200',
@@ -460,11 +466,13 @@ const OrderScreen = () => {
                         )}
                       </CardContent>
                     </Card>
+                    </ScrollReveal>
                   );
                 })}
               </div>
             )}
             {!isLoading && !filteredProducts.length && (
+              <ScrollReveal>
               <Card className="border-dashed">
                 <CardContent className="py-16 text-center text-muted-foreground">
                   <UtensilsCrossed className="h-10 w-10 mx-auto mb-3 opacity-40" />
@@ -472,12 +480,14 @@ const OrderScreen = () => {
                   <p className="text-sm mt-1">Try another search or category.</p>
                 </CardContent>
               </Card>
+              </ScrollReveal>
             )}
           </div>
         </div>
 
         {/* Cart */}
         <aside className="w-full sm:w-[360px] lg:w-[400px] xl:w-[420px] shrink-0 border-l border-border bg-card flex flex-col min-h-0 shadow-[ -4px_0_24px_-12px_rgba(0,0,0,0.08)]">
+          <ScrollReveal className="flex flex-1 flex-col h-full min-h-0 min-w-0 w-full" rootMargin="0px 0px -12px 0px" threshold={0.04}>
           <Card className="flex flex-col h-full min-h-0 rounded-none border-0 shadow-none bg-transparent">
             <CardHeader className="shrink-0 space-y-4 pb-4 border-b border-border/80 px-5 pt-5">
               <div className="flex items-start justify-between gap-2">
@@ -714,6 +724,7 @@ const OrderScreen = () => {
               </div>
             )}
           </Card>
+          </ScrollReveal>
         </aside>
       </div>
 

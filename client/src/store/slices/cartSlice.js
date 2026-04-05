@@ -93,6 +93,25 @@ const cartSlice = createSlice({
       }));
       recalcTotals(state);
     },
+    /** Replace locked lines from server; keep unlocked draft lines — used by POS order poll */
+    mergeServerOrderIntoCart: (state, { payload }) => {
+      state.activeOrder = payload._id;
+      const serverLines = (payload.items || []).map((item) => ({
+        cartLineId: String(item._id),
+        locked: true,
+        productId: item.product?._id || item.product,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        variant: item.variant || '',
+        subtotal: item.subtotal,
+        image: item.product?.image || '',
+        kitchenStatus: item.kitchenStatus || 'pending',
+      }));
+      const draftLines = state.items.filter((i) => !i.locked);
+      state.items = [...serverLines, ...draftLines];
+      recalcTotals(state);
+    },
   },
 });
 
@@ -112,5 +131,7 @@ export const {
   clearLineItems,
   clearCart,
   loadExistingOrder,
+  mergeServerOrderIntoCart,
 } = cartSlice.actions;
 export default cartSlice.reducer;
+export { cartSlice };

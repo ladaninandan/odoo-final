@@ -42,10 +42,22 @@ const FloorTableManagement = () => {
     } catch (err) { toast.error('Failed'); }
   };
 
-  const handleDeleteFloor = async (id) => {
+  const floorCanBeDeleted = (floor) =>
+    !(floor.tables || []).some((t) => t.status !== 'available');
+
+  const handleDeleteFloor = async (floor) => {
+    if (!floorCanBeDeleted(floor)) {
+      toast.error('All tables on this floor must be available before you can delete the floor.');
+      return;
+    }
     if (!window.confirm('Delete this floor and all its tables?')) return;
-    try { await floorsApi.remove(id); dispatch(fetchFloors()); toast.success('Floor deleted'); }
-    catch { toast.error('Failed'); }
+    try {
+      await floorsApi.remove(floor._id);
+      dispatch(fetchFloors());
+      toast.success('Floor deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete floor');
+    }
   };
 
   const handleCreateTable = async () => {
@@ -62,10 +74,19 @@ const FloorTableManagement = () => {
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
   };
 
-  const handleDeleteTable = async (id) => {
+  const handleDeleteTable = async (table) => {
+    if (table.status !== 'available') {
+      toast.error('Only available tables can be deleted. Finish or clear the order first.');
+      return;
+    }
     if (!window.confirm('Delete this table?')) return;
-    try { await tablesApi.remove(id); dispatch(fetchFloors()); toast.success('Table deleted'); }
-    catch { toast.error('Failed'); }
+    try {
+      await tablesApi.remove(table._id);
+      dispatch(fetchFloors());
+      toast.success('Table deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete table');
+    }
   };
 
   return (
@@ -95,7 +116,19 @@ const FloorTableManagement = () => {
                 <Button variant="ghost" size="icon" onClick={() => { setFloorForm({ name: floor.name }); setEditFloorId(floor._id); setFloorDialog(true); }}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDeleteFloor(floor._id)} className="text-destructive">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  disabled={!floorCanBeDeleted(floor)}
+                  title={
+                    floorCanBeDeleted(floor)
+                      ? 'Delete floor'
+                      : 'All tables must be available (not occupied or reserved) to delete this floor'
+                  }
+                  onClick={() => handleDeleteFloor(floor)}
+                  className="text-destructive disabled:opacity-40 disabled:pointer-events-none"
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -119,8 +152,20 @@ const FloorTableManagement = () => {
                     {table.status}
                   </Badge>
                   <button
-                    onClick={() => handleDeleteTable(table._id)}
-                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    type="button"
+                    disabled={table.status !== 'available'}
+                    title={
+                      table.status === 'available'
+                        ? 'Delete table'
+                        : 'Only available tables can be deleted'
+                    }
+                    onClick={() => handleDeleteTable(table)}
+                    className={cn(
+                      'absolute -top-2 -right-2 h-5 w-5 rounded-full text-white text-xs flex items-center justify-center transition-opacity',
+                      table.status === 'available'
+                        ? 'bg-destructive opacity-0 group-hover:opacity-100'
+                        : 'bg-muted text-muted-foreground cursor-not-allowed opacity-40'
+                    )}
                   >
                     ×
                   </button>

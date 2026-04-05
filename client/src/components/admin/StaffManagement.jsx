@@ -11,6 +11,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '../ui/Select';
 import { cn } from '../../lib/utils';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import {
   Loader2,
   Users,
@@ -179,6 +180,7 @@ const StaffManagement = () => {
       ) : null}
 
       {/* Table card */}
+      <ScrollReveal>
       <Card className="border shadow-sm overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20 space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -307,6 +309,7 @@ const StaffManagement = () => {
           )}
         </CardContent>
       </Card>
+      </ScrollReveal>
     </div>
   );
 };

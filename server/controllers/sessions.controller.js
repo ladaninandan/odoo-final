@@ -1,4 +1,5 @@
 import Session from '../models/Session.js';
+import Order from '../models/Order.js';
 
 export const getSessions = async (req, res) => {
   try {
@@ -16,7 +17,21 @@ export const getCurrentSession = async (req, res) => {
     const session = await Session.findOne({ openedBy: req.user._id, status: 'open' })
       .populate('openedBy', 'first_name last_name');
 
-    res.json(session);
+    if (!session) {
+      return res.json(null);
+    }
+
+    const pendingOrdersCount = await Order.countDocuments({
+      session: session._id,
+      status: { $nin: ['paid', 'cancelled'] },
+    });
+
+    const obj = session.toObject();
+    res.json({
+      ...obj,
+      pendingOrdersCount,
+      canCloseSession: pendingOrdersCount === 0,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch current session', error: err.message });
   }
@@ -36,8 +51,12 @@ export const openSession = async (req, res) => {
     });
 
     const populated = await session.populate('openedBy', 'first_name last_name');
-
-    res.status(201).json(populated);
+    const obj = populated.toObject();
+    res.status(201).json({
+      ...obj,
+      pendingOrdersCount: 0,
+      canCloseSession: true,
+    });
   } catch (err) {
     res.status(400).json({ message: 'Failed to open session', error: err.message });
   }
@@ -54,6 +73,17 @@ export const closeSession = async (req, res) => {
     }
     if (session.status === 'closed') {
       return res.status(400).json({ message: 'Session is already closed' });
+    }
+
+    const pendingOrders = await Order.countDocuments({
+      session: session._id,
+      status: { $nin: ['paid', 'cancelled'] },
+    });
+    if (pendingOrders > 0) {
+      return res.status(409).json({
+        message:
+          'Cannot close this session while orders are still open. Complete payment for every order (or cancel them) before closing the till.',
+      });
     }
 
     const { closingBalance } = req.body;

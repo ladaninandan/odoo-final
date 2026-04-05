@@ -41,9 +41,20 @@ export const updateFloor = async (req, res) => {
 
 export const deleteFloor = async (req, res) => {
   try {
-    await Table.deleteMany({ floor: req.params.id });
-    const floor = await Floor.findByIdAndDelete(req.params.id);
+    const floor = await Floor.findById(req.params.id);
     if (!floor) return res.status(404).json({ message: 'Floor not found' });
+
+    const tablesOnFloor = await Table.find({ floor: req.params.id, isActive: true });
+    const blocked = tablesOnFloor.filter((t) => t.status !== 'available');
+    if (blocked.length > 0) {
+      return res.status(409).json({
+        message:
+          'Cannot delete this floor while any table is occupied or reserved. Free all tables first.',
+      });
+    }
+
+    await Table.deleteMany({ floor: req.params.id });
+    await Floor.findByIdAndDelete(req.params.id);
     res.json({ message: 'Floor and its tables deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to delete floor', error: err.message });

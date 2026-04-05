@@ -16,6 +16,7 @@ import {
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '../ui/Table';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Pencil, Trash2, Package, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -124,6 +125,7 @@ const ProductList = () => {
         </Button>
       </div>
 
+      <ScrollReveal>
       <Card>
         <Table>
           <TableHeader>
@@ -172,6 +174,7 @@ const ProductList = () => {
           </TableBody>
         </Table>
       </Card>
+      </ScrollReveal>
 
       {/* Create/Edit Dialog */}
       <Dialog

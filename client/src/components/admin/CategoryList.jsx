@@ -12,6 +12,7 @@ import {
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '../ui/Table';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -62,6 +63,7 @@ const CategoryList = () => {
         <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> Add Category</Button>
       </div>
 
+      <ScrollReveal>
       <Card>
         <Table>
           <TableHeader>
@@ -92,6 +94,7 @@ const CategoryList = () => {
           </TableBody>
         </Table>
       </Card>
+      </ScrollReveal>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-sm">

@@ -12,6 +12,7 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency';
 import { getStatusLabel, getStatusVariant } from '../../utils/orderHelpers';
 import { cn } from '../../lib/utils';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import {
   ResponsiveContainer,
   BarChart,
@@ -305,6 +306,7 @@ const ReportsDashboard = () => {
         </Card>
 
       {/* Orders table */}
+      <ScrollReveal>
       <Card className="border shadow-sm overflow-hidden">
         <CardHeader className="border-b border-border bg-muted/20">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -370,6 +372,7 @@ const ReportsDashboard = () => {
           )}
         </CardContent>
       </Card>
+      </ScrollReveal>
     </div>
   );
 };

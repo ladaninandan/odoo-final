@@ -22,6 +22,7 @@ import {
   TableHead,
   TableCell,
 } from '../ui/Table';
+import { ScrollReveal } from '../ui/ScrollReveal';
 import {
   Plus,
   Pencil,
@@ -161,6 +162,7 @@ const CustomerList = () => {
         </Button>
       </div>
 
+      <ScrollReveal>
       <Card className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-md">
         <CardHeader className="border-b border-border/60 bg-gradient-to-br from-muted/50 via-card to-card px-5 py-5 sm:px-6 space-y-4">
           <div>
@@ -331,6 +333,7 @@ const CustomerList = () => {
           </div>
         </CardContent>
       </Card>
+      </ScrollReveal>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[min(92vh,760px)] overflow-y-auto sm:max-w-lg p-0 gap-0 sm:rounded-2xl border-border/80 shadow-2xl">
