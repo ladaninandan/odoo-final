@@ -3,7 +3,6 @@ import BlockedIp from '../../models/BlockedIp.js';
 import LoginAttempt from '../../models/LoginAttempt.js';
 import RefreshToken from '../../models/RefreshToken.js';
 import UserSession from '../../models/UserSession.js';
-import redisClient from '../../config/redis.js';
 import mongoose from 'mongoose';
 import { generateTokens } from './authUtils.js';
 
@@ -29,6 +28,10 @@ export const loginUser = async (req, res) => {
   }
 
   if (user && (await user.matchPassword(password))) {
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Account is not active. Contact an administrator.' });
+    }
+
     const sessionId = new mongoose.Types.ObjectId();
     const { accessToken, refreshToken } = generateTokens(user._id, sessionId);
 
@@ -38,9 +41,6 @@ export const loginUser = async (req, res) => {
       token: refreshToken,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
-
-    // Save to Redis explicitly for device-level logout
-    await redisClient.set(`session:refresh:${user._id}:${sessionId}`, refreshToken, 'EX', 7 * 24 * 60 * 60);
 
     // 3. Multi-Device Tracking: Record this successfully authenticated session
     await UserSession.create({
@@ -66,7 +66,10 @@ export const loginUser = async (req, res) => {
     res.json({
       _id: user._id,
       name: user.first_name,
+      first_name: user.first_name,
+      last_name: user.last_name || '',
       email: user.email,
+      role: user.role,
       accessToken,
     });
   } else {

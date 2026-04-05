@@ -1,12 +1,13 @@
 import User from '../../models/User.js';
-import redisClient from '../../config/redis.js';
+import UserSession from '../../models/UserSession.js';
+import RefreshToken from '../../models/RefreshToken.js';
+import PasswordResetOtp from '../../models/PasswordResetOtp.js';
 import generateOtp from '../../utils/generateOtp.js';
 import { sendEmail } from '../../config/nodemailer.js';
 
 export const requestOtp = async (req, res) => {
-  const { identifier, method } = req.body; // method should be 'email' or 'phone'
+  const { identifier, method } = req.body;
 
-  // You can also determine method automatically if method string isn't sent
   const searchParam = method === 'email' || identifier.includes('@')
     ? { email: identifier }
     : { phone: identifier };
@@ -18,8 +19,12 @@ export const requestOtp = async (req, res) => {
   }
 
   const otp = generateOtp();
-  // Cache for 10 mins (600 seconds)
-  await redisClient.set(`otp:${identifier}`, otp, 'EX', 600);
+  await PasswordResetOtp.deleteMany({ identifier });
+  await PasswordResetOtp.create({
+    identifier,
+    code: otp,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+  });
 
   try {
     if (identifier.includes('@') || method === 'email') {
@@ -39,9 +44,13 @@ export const requestOtp = async (req, res) => {
 export const verifyOtpAndResetPassword = async (req, res) => {
   const { identifier, otp, newPassword } = req.body;
 
-  const storedOtp = await redisClient.get(`otp:${identifier}`);
+  const otpDoc = await PasswordResetOtp.findOneAndDelete({
+    identifier,
+    code: otp,
+    expiresAt: { $gt: new Date() },
+  });
 
-  if (!storedOtp || storedOtp !== otp) {
+  if (!otpDoc) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }
 
@@ -50,12 +59,14 @@ export const verifyOtpAndResetPassword = async (req, res) => {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  user.password_hash = newPassword; // Will be hashed by mongoose hook
+  user.password_hash = newPassword;
   await user.save();
 
-  // Clear otp and all sessions
-  await redisClient.del(`otp:${identifier}`);
-  await redisClient.del(`session:refresh:${user._id}`);
+  await RefreshToken.updateMany({ user_id: user._id }, { $set: { is_revoked: true } });
+  await UserSession.updateMany(
+    { user_id: user._id, is_active: true },
+    { $set: { is_active: false, logout_time: new Date() } }
+  );
 
   res.status(200).json({ message: 'Password reset successful' });
 };
