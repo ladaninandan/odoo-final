@@ -2,51 +2,61 @@ import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchKitchenOrders, advanceStage, markKitchenItemPrepared } from '../../store/slices/kitchenSlice';
+import { logoutSuccess } from '../../store/slices/authSlice';
+import authApi from '../../api/authApi';
 import useAuth from '../../hooks/useAuth';
 import { getOrderKitchenStage, getKitchenStageLabel } from '../../utils/orderHelpers';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { Skeleton } from '../ui/Skeleton';
 import { Toaster } from '../ui/Toaster';
+import { Separator } from '../ui/Separator';
 import { cn } from '../../lib/utils';
 import {
   ChefHat,
   CheckCircle2,
   RefreshCw,
   Search,
-  Menu,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
+  Clock,
+  Filter,
+  LogOut,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import categoriesApi from '../../api/categoriesApi';
+import productsApi from '../../api/productsApi';
 
 const PAGE_SIZE = 9;
 
-/** Matches original kitchen column accent colors */
+/** Stage: slim top accent + neutral-friendly badges */
 const stageStyles = {
   to_cook: {
-    border: 'border-t-yellow-500',
-    badge: 'bg-yellow-500/15 text-yellow-900 dark:text-yellow-100 border-0',
+    bar: 'bg-amber-500',
+    badge: 'border border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-300',
   },
   preparing: {
-    border: 'border-t-orange-500',
-    badge: 'bg-orange-500/15 text-orange-900 dark:text-orange-100 border-0',
+    bar: 'bg-orange-500',
+    badge: 'border border-orange-500/20 bg-orange-500/10 text-orange-800 dark:text-orange-300',
   },
   completed: {
-    border: 'border-t-green-500',
-    badge: 'bg-green-500/15 text-green-900 dark:text-green-100 border-0',
+    bar: 'bg-emerald-600',
+    badge: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
   },
 };
 
-const tabBadgeStyles = {
-  all: 'bg-secondary text-secondary-foreground',
-  to_cook: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-100',
-  preparing: 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100',
-  completed: 'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100',
-};
+const filterPanelClass = 'rounded-md border border-border bg-muted/40 p-2';
+const sidebarBtn =
+  'flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm text-foreground transition-colors';
+const sidebarBtnActive = 'bg-background font-medium shadow-sm ring-1 ring-border';
+const sidebarBtnIdle = 'hover:bg-background/80';
+const sidebarSubBtn =
+  'flex w-full items-center rounded-md px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground';
+const sidebarSectionBtn =
+  'mb-2 flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm font-medium text-foreground hover:bg-muted/60';
 
 function buildFlatOrders(orders) {
   return [...orders.to_cook, ...orders.preparing, ...orders.completed];
@@ -79,6 +89,20 @@ function orderMatchesCategory(order, categoryId) {
   });
 }
 
+/** Lines under a catalog product for variant "sub-products" in the sidebar */
+function variantSubLines(product) {
+  const lines = [];
+  (product.variants || []).forEach((v) => {
+    (v.values || []).forEach((val) => {
+      const attr = (v.attribute || '').trim();
+      const label = (val.label || '').trim();
+      if (!label && !attr) return;
+      lines.push(attr ? `${attr}: ${label}` : label);
+    });
+  });
+  return lines;
+}
+
 const KitchenDisplay = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -92,9 +116,38 @@ const KitchenDisplay = () => {
   const [page, setPage] = useState(0);
   const [markingItemId, setMarkingItemId] = useState(null);
 
+  const [catalogCategories, setCatalogCategories] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [productSectionOpen, setProductSectionOpen] = useState(true);
+  const [categorySectionOpen, setCategorySectionOpen] = useState(true);
+
   useEffect(() => {
     dispatch(fetchKitchenOrders());
   }, [dispatch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [catRes, prodRes] = await Promise.all([
+          categoriesApi.getAll(),
+          productsApi.getAll({ active: 'true' }),
+        ]);
+        if (!cancelled) {
+          setCatalogCategories(Array.isArray(catRes.data) ? catRes.data : []);
+          setCatalogProducts(Array.isArray(prodRes.data) ? prodRes.data : []);
+        }
+      } catch {
+        if (!cancelled) toast.error('Could not load menu for filters');
+      } finally {
+        if (!cancelled) setCatalogLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const flatOrders = useMemo(() => buildFlatOrders(orders), [orders]);
 
@@ -136,6 +189,47 @@ const KitchenDisplay = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [flatOrders]);
 
+  const categoriesForSidebar = useMemo(() => {
+    if (catalogCategories.length > 0) {
+      return catalogCategories
+        .map((c) => ({ id: String(c._id), name: c.name || 'Category' }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (catalogProducts.length > 0) {
+      const catMap = new Map();
+      catalogProducts.forEach((p) => {
+        const c = p.category;
+        if (c && typeof c === 'object' && c._id != null) {
+          catMap.set(String(c._id), c.name || 'Category');
+        }
+      });
+      if (catMap.size > 0) {
+        return Array.from(catMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+    }
+    return categoryOptions;
+  }, [catalogCategories, categoryOptions, catalogProducts]);
+
+  const productsByCategoryId = useMemo(() => {
+    const map = new Map();
+    catalogProducts.forEach((p) => {
+      const raw = p.category;
+      const cid =
+        raw && typeof raw === 'object' && raw._id != null
+          ? String(raw._id)
+          : raw != null
+            ? String(raw)
+            : '';
+      if (!cid) return;
+      if (!map.has(cid)) map.set(cid, []);
+      map.get(cid).push(p);
+    });
+    map.forEach((arr) => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+    return map;
+  }, [catalogProducts]);
+
   const baseList = useMemo(() => {
     if (statusFilter === 'all') return flatOrders;
     return orders[statusFilter] || [];
@@ -172,6 +266,155 @@ const KitchenDisplay = () => {
     setPage(0);
   }, []);
 
+  const activeProductLabel = useMemo(() => {
+    if (!productFilter) return null;
+    const hit = productOptions.find((n) => n.toLowerCase() === productFilter);
+    return hit || productFilter;
+  }, [productFilter, productOptions]);
+
+  const activeCategoryLabel = useMemo(() => {
+    if (!categoryFilter) return null;
+    return categoriesForSidebar.find((c) => c.id === categoryFilter)?.name ?? null;
+  }, [categoryFilter, categoriesForSidebar]);
+
+  const kitchenProductPanel = useMemo(
+    () => (
+      <div className="space-y-3">
+        {!catalogLoaded && (
+          <p className="rounded-lg bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+            Loading menu…
+          </p>
+        )}
+        {catalogLoaded && catalogProducts.length === 0 && productOptions.length === 0 && (
+          <p className="rounded-lg bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+            No products in queue
+          </p>
+        )}
+        {catalogProducts.length > 0
+          ? categoriesForSidebar.map(({ id: catId, name: catName }) => {
+              const prods = productsByCategoryId.get(catId) || [];
+              if (prods.length === 0) return null;
+              return (
+                <div key={catId} className={filterPanelClass}>
+                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">{catName}</p>
+                  <div className="space-y-1">
+                    {prods.map((p) => {
+                      const name = (p.name || '').trim() || 'Product';
+                      const key = name.toLowerCase();
+                      const sel = productFilter === key;
+                      const sub = variantSubLines(p);
+                      return (
+                        <div key={p._id || key}>
+                          <button
+                            type="button"
+                            onClick={() => setProductFilter(sel ? null : key)}
+                            className={cn(sidebarBtn, sel ? sidebarBtnActive : sidebarBtnIdle)}
+                          >
+                            <span className="min-w-0 flex-1 break-words">{name}</span>
+                          </button>
+                          {sub.length > 0 && (
+                            <ul className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2 text-[11px] text-muted-foreground">
+                              {sub.map((line, i) => (
+                                <li key={`${key}-${i}`} className="break-words">
+                                  {line}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          : productOptions.map((name) => {
+              const key = name.toLowerCase();
+              const sel = productFilter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setProductFilter(sel ? null : key)}
+                  className={cn(sidebarBtn, sel ? sidebarBtnActive : sidebarBtnIdle)}
+                >
+                  <span className="min-w-0 flex-1 break-words">{name}</span>
+                </button>
+              );
+            })}
+      </div>
+    ),
+    [
+      catalogLoaded,
+      catalogProducts,
+      categoriesForSidebar,
+      productsByCategoryId,
+      productOptions,
+      productFilter,
+    ]
+  );
+
+  const kitchenCategoryPanel = useMemo(
+    () => (
+      <div className={filterPanelClass}>
+        <div className="space-y-2">
+          {!catalogLoaded && (
+            <p className="rounded-md bg-muted/50 px-2 py-2 text-center text-xs text-muted-foreground">
+              Loading menu…
+            </p>
+          )}
+          {catalogLoaded && categoriesForSidebar.length === 0 && (
+            <p className="rounded-md bg-muted/50 px-2 py-2 text-center text-xs text-muted-foreground">
+              No categories (add to products)
+            </p>
+          )}
+          {categoriesForSidebar.map(({ id, name }) => {
+            const sel = categoryFilter === id;
+            const subProds = productsByCategoryId.get(id) || [];
+            return (
+              <div key={id} className="border-b border-border/60 py-1 last:border-0 last:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter(sel ? null : id)}
+                  className={cn(
+                    sidebarBtn,
+                    sel ? 'font-medium text-primary' : sidebarBtnIdle
+                  )}
+                >
+                  <span className="min-w-0 flex-1 break-words">{name}</span>
+                </button>
+                {subProds.length > 0 && (
+                  <ul className="ml-2 mt-0.5 space-y-0 border-l border-border pl-2">
+                    {subProds.map((p) => {
+                      const pname = (p.name || '').trim() || 'Product';
+                      const pkey = pname.toLowerCase();
+                      const pSel = productFilter === pkey;
+                      return (
+                        <li key={p._id || pkey}>
+                          <button
+                            type="button"
+                            onClick={() => setProductFilter(pSel ? null : pkey)}
+                            className={cn(
+                              sidebarSubBtn,
+                              pSel ? 'font-medium text-foreground' : ''
+                            )}
+                          >
+                            <span className="min-w-0 flex-1 break-words">{pname}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ),
+    [catalogLoaded, categoriesForSidebar, productsByCategoryId, categoryFilter, productFilter]
+  );
+
   const handleAdvance = useCallback(
     async (orderId) => {
       try {
@@ -197,6 +440,16 @@ const KitchenDisplay = () => {
     [handleAdvance]
   );
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      /* ignore */
+    }
+    dispatch(logoutSuccess());
+    navigate('/login');
+  }, [dispatch, navigate]);
+
   const handleItemClick = useCallback(
     async (e, item) => {
       e.stopPropagation();
@@ -216,11 +469,22 @@ const KitchenDisplay = () => {
 
   if (isLoading && !flatOrders.length) {
     return (
-      <div className="h-screen p-6 bg-background">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-48" />
-          ))}
+      <div className="min-h-screen bg-background">
+        <div className="border-b bg-card px-4 py-4 md:px-6">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-40 rounded-md" />
+              <Skeleton className="h-3 w-28 rounded-md" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-muted/30 p-4 md:p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-44 rounded-lg border border-border/60" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -234,14 +498,19 @@ const KitchenDisplay = () => {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground">
-      <header className="shrink-0 border-b bg-card px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <ChefHat className="h-7 w-7 text-primary shrink-0" />
-            <h1 className="text-lg font-bold truncate">Kitchen Display</h1>
+    <div className="flex h-screen min-h-0 flex-col bg-background text-foreground">
+      <header className="shrink-0 border-b bg-card">
+        <div className="mx-auto flex max-w-[1920px] flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <ChefHat className="h-5 w-5" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold md:text-lg">Kitchen</h1>
+              <p className="truncate text-xs text-muted-foreground">Order queue</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {isAdmin && (
               <>
                 <Button variant="outline" size="sm" onClick={() => navigate('/pos/floor')}>
@@ -252,15 +521,25 @@ const KitchenDisplay = () => {
                 </Button>
               </>
             )}
-            <Button variant="ghost" size="sm" className="gap-2" onClick={() => dispatch(fetchKitchenOrders())}>
-              <RefreshCw className="h-4 w-4" /> Refresh
+            <Button variant="secondary" size="sm" className="gap-2" onClick={() => dispatch(fetchKitchenOrders())}>
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-muted-foreground"
+              onClick={handleLogout}
+              aria-label="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Log out</span>
             </Button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <Menu className="h-5 w-5 text-muted-foreground hidden sm:block" aria-hidden />
+        <div className="mx-auto flex max-w-[1920px] flex-col gap-3 border-t px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
+          <div className="inline-flex w-fit flex-wrap gap-0.5 rounded-md bg-muted p-0.5">
             {statusTabs.map((tab) => {
               const active = statusFilter === tab.key;
               const n = counts[tab.key] ?? 0;
@@ -270,38 +549,31 @@ const KitchenDisplay = () => {
                   type="button"
                   onClick={() => setStatusFilter(tab.key)}
                   className={cn(
-                    'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                    active ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted/70'
+                    'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                    active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   {tab.label}
-                  <span
-                    className={cn(
-                      'rounded-md px-2 py-0.5 text-xs font-semibold min-w-[1.5rem] text-center',
-                      tabBadgeStyles[tab.key] || 'bg-secondary text-secondary-foreground'
-                    )}
-                  >
-                    {n}
-                  </span>
+                  <span className="tabular-nums text-xs text-muted-foreground">{n}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">
+            <div className="relative min-w-0 flex-1 md:max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="h-9 rounded-md border-border bg-background pl-8"
               />
             </div>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 className="h-9 w-9"
                 disabled={safePage <= 0}
@@ -309,12 +581,13 @@ const KitchenDisplay = () => {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="tabular-nums px-2 min-w-[5rem] text-center text-foreground">
-                {totalFiltered === 0 ? '0' : `${pageStart}–${pageEnd}`} / {totalFiltered}
+              <span className="min-w-[4.5rem] text-center tabular-nums">
+                <span className="text-foreground">{totalFiltered === 0 ? '0' : `${pageStart}–${pageEnd}`}</span> /{' '}
+                {totalFiltered}
               </span>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 className="h-9 w-9"
                 disabled={safePage >= pageCount - 1}
@@ -327,79 +600,110 @@ const KitchenDisplay = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0">
-        <aside className="hidden md:flex w-56 shrink-0 flex-col border-r bg-muted/30 p-3 overflow-y-auto">
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="mb-4 flex items-center gap-2 text-sm text-primary hover:underline"
-          >
-            <X className="h-4 w-4" /> Clear filters
-          </button>
-
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Product</p>
-          <div className="space-y-1 mb-6">
-            {productOptions.length === 0 && (
-              <p className="text-xs text-muted-foreground">No products in queue</p>
+      <div className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1">
+        <aside className="hidden min-h-0 w-64 shrink-0 border-r bg-muted/30 md:flex md:min-h-0 md:flex-col lg:w-72">
+          <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Filter className="h-4 w-4 text-muted-foreground" aria-hidden />
+              Filters
+            </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm transition hover:bg-muted/50"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+              Clear all
+            </button>
+            {(productFilter || categoryFilter) && (
+              <div className="flex flex-wrap gap-1.5">
+                {categoryFilter && activeCategoryLabel && (
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter(null)}
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted/50"
+                  >
+                    <span className="text-muted-foreground">{activeCategoryLabel}</span>
+                    <X className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                )}
+                {productFilter && activeProductLabel && (
+                  <button
+                    type="button"
+                    onClick={() => setProductFilter(null)}
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted/50"
+                  >
+                    <span className="text-muted-foreground">{activeProductLabel}</span>
+                    <X className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                )}
+              </div>
             )}
-            {productOptions.map((name) => {
-              const key = name.toLowerCase();
-              const sel = productFilter === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setProductFilter(sel ? null : key)}
-                  className={cn(
-                    'w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors',
-                    sel ? 'bg-muted font-medium text-foreground' : 'text-foreground hover:bg-muted/80'
-                  )}
-                >
-                  {name}
-                </button>
-              );
-            })}
           </div>
 
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Category</p>
-          <div className="space-y-1">
-            {categoryOptions.length === 0 && (
-              <p className="text-xs text-muted-foreground">No categories (add to products)</p>
-            )}
-            {categoryOptions.map(({ id, name }) => {
-              const sel = categoryFilter === id;
-              return (
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 [scrollbar-gutter:stable]">
+            <div className="space-y-4">
+              <div>
                 <button
-                  key={id}
                   type="button"
-                  onClick={() => setCategoryFilter(sel ? null : id)}
-                  className={cn(
-                    'w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors',
-                    sel
-                      ? 'bg-primary/10 font-medium text-primary ring-1 ring-primary/30'
-                      : 'text-foreground hover:bg-muted/80'
-                  )}
+                  onClick={() => setProductSectionOpen((o) => !o)}
+                  className={sidebarSectionBtn}
+                  aria-expanded={productSectionOpen}
                 >
-                  {name}
+                  Products
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                      productSectionOpen ? 'rotate-0' : '-rotate-90'
+                    )}
+                  />
                 </button>
-              );
-            })}
+                {productSectionOpen && <div className="mt-3">{kitchenProductPanel}</div>}
+              </div>
+
+              <Separator className="bg-border/60" />
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setCategorySectionOpen((o) => !o)}
+                  className={sidebarSectionBtn}
+                  aria-expanded={categorySectionOpen}
+                >
+                  Categories
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                      categorySectionOpen ? 'rotate-0' : '-rotate-90'
+                    )}
+                  />
+                </button>
+                {categorySectionOpen && <div className="mt-3">{kitchenCategoryPanel}</div>}
+              </div>
+            </div>
           </div>
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-4">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-4 md:px-6">
           {visibleOrders.length === 0 ? (
-            <div className="flex h-full min-h-[240px] items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground">
-              No orders match your filters
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-background px-6 py-12 text-center">
+              <ChefHat className="mb-3 h-10 w-10 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-foreground">No orders</p>
+              <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                Change filters or queue tab to see tickets.
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {visibleOrders.map((order) => {
                 const stage = getOrderKitchenStage(order);
                 const st = stageStyles[stage] || stageStyles.to_cook;
                 const elapsed = Math.round(
                   (Date.now() - new Date(order.createdAt).getTime()) / 60000
                 );
+                const items = order.items || [];
+                const doneCount = items.filter((i) => i.kitchenStatus === 'completed').length;
+                const nItems = items.length;
                 return (
                   <Card
                     key={order._id}
@@ -413,81 +717,92 @@ const KitchenDisplay = () => {
                       }
                     }}
                     className={cn(
-                      'cursor-pointer border bg-card transition hover:bg-accent/30 animate-fade-in border-t-4',
-                      st.border,
-                      'focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring'
+                      'cursor-pointer overflow-hidden rounded-lg border bg-card transition-shadow animate-fade-in',
+                      'hover:shadow-md',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                     )}
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-base">{order.orderNumber}</CardTitle>
-                        <div className="flex flex-wrap items-center gap-1.5 justify-end">
-                          <Badge className={cn('text-[10px] font-semibold', st.badge)}>
-                            {getKitchenStageLabel(stage)}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            Table {order.table?.tableNumber ?? '?'}
-                          </Badge>
-                          <Badge
-                            variant={elapsed > 15 ? 'destructive' : elapsed > 10 ? 'warning' : 'secondary'}
-                            className="text-[10px]"
-                          >
-                            {elapsed}m
-                          </Badge>
+                    <div className={cn('h-0.5 w-full', st.bar)} />
+                    <CardHeader className="space-y-3 pb-2 pt-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <CardTitle className="font-mono text-sm font-semibold tracking-tight">
+                            {order.orderNumber}
+                          </CardTitle>
+                          {order.customer?.name && (
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {order.customer.name}
+                              {(order.customer.mobile || order.customer.phone)
+                                ? ` · ${order.customer.mobile || order.customer.phone}`
+                                : ''}
+                            </p>
+                          )}
+                          {nItems > 0 && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {doneCount}/{nItems} prepared
+                            </p>
+                          )}
                         </div>
-                      </div>
-                      {order.customer?.name && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {order.customer.name}
-                          {(order.customer.mobile || order.customer.phone)
-                            ? ` · ${order.customer.mobile || order.customer.phone}`
-                            : ''}
-                        </p>
-                      )}
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Tap row to mark prepared · Tap card to advance stage
-                      </p>
-                      {order.items?.map((item) => {
-                        const done = item.kitchenStatus === 'completed';
-                        const busy = markingItemId === item._id;
-                        return (
-                          <button
-                            key={item._id}
-                            type="button"
-                            onClick={(e) => handleItemClick(e, item)}
-                            disabled={done || busy}
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <span
                             className={cn(
-                              'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition',
-                              'hover:bg-muted/60',
-                              done && 'opacity-80',
-                              busy && 'opacity-60'
+                              'rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                              st.badge
                             )}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            {getKitchenStageLabel(stage)}
+                          </span>
+                          <div className="flex flex-wrap justify-end gap-1 text-[11px] text-muted-foreground">
+                            <span className="tabular-nums">Table {order.table?.tableNumber ?? '—'}</span>
+                            <span className="text-border">·</span>
+                            <span className="inline-flex items-center gap-0.5 tabular-nums">
+                              <Clock className="h-3 w-3" />
+                              {elapsed}m
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-0 pb-4 pt-0">
+                      <div className="divide-y divide-border rounded-md border bg-background">
+                        {order.items?.map((item) => {
+                          const done = item.kitchenStatus === 'completed';
+                          const busy = markingItemId === item._id;
+                          return (
+                            <button
+                              key={item._id}
+                              type="button"
+                              onClick={(e) => handleItemClick(e, item)}
+                              disabled={done || busy}
+                              className={cn(
+                                'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors',
+                                'hover:bg-muted/50',
+                                done && 'bg-muted/30',
+                                busy && 'opacity-50'
+                              )}
+                            >
                               {done ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-500" />
                               ) : (
-                                <div className="h-4 w-4 rounded-full border-2 border-muted-foreground shrink-0" />
+                                <span className="h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/40" />
                               )}
                               <span
                                 className={cn(
-                                  'truncate',
-                                  done &&
-                                    'text-muted-foreground [text-decoration-line:line-through] [text-decoration-style:dashed] [text-decoration-thickness:2px]'
+                                  'min-w-0 flex-1 leading-snug',
+                                  done && 'text-muted-foreground line-through'
                                 )}
                               >
-                                {item.quantity} × {item.name}
+                                <span className="tabular-nums text-muted-foreground">{item.quantity}×</span>{' '}
+                                {item.name}
                               </span>
-                            </div>
-                            {busy && <span className="text-[10px] text-muted-foreground">…</span>}
-                          </button>
-                        );
-                      })}
+                              {busy && <span className="text-xs text-muted-foreground">…</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
                       {order.notes && (
-                        <p className="text-xs text-muted-foreground mt-2 italic border-t pt-2">
-                          Note: {order.notes}
+                        <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                          {order.notes}
                         </p>
                       )}
                     </CardContent>
@@ -499,52 +814,60 @@ const KitchenDisplay = () => {
         </main>
       </div>
 
-      {/* Mobile: compact filter chips */}
-      <div className="md:hidden border-t bg-card p-2 space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="text-xs" onClick={clearFilters}>
-            Clear filters
-          </Button>
-          {productOptions.slice(0, 8).map((name) => {
-            const key = name.toLowerCase();
-            const sel = productFilter === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setProductFilter(sel ? null : key)}
-                className={cn(
-                  'rounded-full px-2 py-1 text-xs',
-                  sel ? 'bg-muted font-medium text-foreground' : 'bg-secondary/50 text-muted-foreground'
-                )}
-              >
-                {name}
-              </button>
-            );
-          })}
-        </div>
-        {categoryOptions.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {categoryOptions.map(({ id, name }) => {
-              const sel = categoryFilter === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setCategoryFilter(sel ? null : id)}
-                  className={cn(
-                    'rounded-full px-2 py-1 text-xs',
-                    sel
-                      ? 'bg-primary/15 font-medium text-primary ring-1 ring-primary/25'
-                      : 'bg-secondary/50 text-muted-foreground'
-                  )}
-                >
-                  {name}
-                </button>
-              );
-            })}
+      {/* Mobile filters */}
+      <div className="shrink-0 border-t bg-card md:hidden">
+        <div className="max-h-[min(50vh,26rem)] space-y-3 overflow-y-auto p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Filter className="h-4 w-4 text-muted-foreground" aria-hidden />
+            Filters
           </div>
-        )}
+          <Button variant="outline" size="sm" className="h-9 w-full" onClick={clearFilters}>
+            <X className="mr-2 h-4 w-4" />
+            Clear all
+          </Button>
+          {(productFilter || categoryFilter) && (
+            <div className="flex flex-wrap gap-1.5">
+              {categoryFilter && activeCategoryLabel && (
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter(null)}
+                  className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs"
+                >
+                  <span className="truncate text-muted-foreground">{activeCategoryLabel}</span>
+                  <X className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                </button>
+              )}
+              {productFilter && activeProductLabel && (
+                <button
+                  type="button"
+                  onClick={() => setProductFilter(null)}
+                  className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs"
+                >
+                  <span className="truncate text-muted-foreground">{activeProductLabel}</span>
+                  <X className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+                </button>
+              )}
+            </div>
+          )}
+          <details className="rounded-md border bg-background">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              Products
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </summary>
+            <div className="max-h-48 overflow-y-auto border-t px-2 py-2">
+              {kitchenProductPanel}
+            </div>
+          </details>
+          <details className="rounded-md border bg-background">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              Categories
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </summary>
+            <div className="max-h-44 overflow-y-auto border-t px-2 py-2">
+              {kitchenCategoryPanel}
+            </div>
+          </details>
+        </div>
       </div>
 
       <Toaster />

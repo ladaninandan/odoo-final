@@ -42,7 +42,7 @@ const FloorPlan = () => {
     }
     dispatch(setActiveCustomer(null));
     dispatch(clearLineItems());
-    navigate(`/pos/table/${table._id}/customer`);
+    navigate(`/pos/order/${table._id}`);
   };
 
   const handleOpenSession = async () => {

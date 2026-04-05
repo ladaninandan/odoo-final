@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts, fetchCategories } from '../../store/slices/productsSlice';
@@ -29,6 +29,7 @@ import {
 import toast from 'react-hot-toast';
 
 import { getServerOrigin } from '../../utils/lanServerUrl';
+import CustomerSelectDialog from './CustomerSelectDialog';
 
 const API_URL = getServerOrigin();
 
@@ -63,6 +64,7 @@ const OrderScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [resumeReady, setResumeReady] = useState(false);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchProducts());
@@ -117,13 +119,6 @@ const OrderScreen = () => {
     return () => { cancelled = true; };
   }, [dispatch, tableId, navigate]);
 
-  useEffect(() => {
-    if (!tableId || !resumeReady) return;
-    if (!activeCustomer?._id) {
-      navigate(`/pos/table/${tableId}/customer`, { replace: true });
-    }
-  }, [tableId, activeCustomer, navigate, resumeReady]);
-
   const filteredProducts = products.filter((p) => {
     const matchSearch = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchCategory = !selectedCategory || p.category?._id === selectedCategory;
@@ -144,7 +139,7 @@ const OrderScreen = () => {
     if (!items.length) return toast.error('Cart is empty');
     if (!activeCustomer?._id) {
       toast.error('Select a customer first');
-      navigate(`/pos/table/${tableId}/customer`);
+      setCustomerDialogOpen(true);
       return;
     }
     if (!session) {
@@ -197,6 +192,10 @@ const OrderScreen = () => {
 
   const handlePayNow = async () => {
     if (!activeOrder) return;
+    if (!canPayNow) {
+      toast.error('Wait until every item is completed in the kitchen before taking payment.');
+      return;
+    }
     if (!session) {
       toast.error('Open a session first');
       return;
@@ -221,6 +220,26 @@ const OrderScreen = () => {
 
   const isResume = Boolean(activeOrder);
   const unpaid = isResume;
+
+  /** Matches server: every line sent to kitchen and marked completed. */
+  const canPayNow = useMemo(() => {
+    if (!activeOrder || !items.length) return false;
+    return items.every((i) => i.locked && i.kitchenStatus === 'completed');
+  }, [activeOrder, items]);
+
+  useEffect(() => {
+    if (!activeOrder || canPayNow) return undefined;
+    const t = setInterval(async () => {
+      try {
+        const { data } = await ordersApi.getById(activeOrder);
+        dispatch(loadExistingOrder(data));
+        dispatch(setCurrentOrder(data));
+      } catch {
+        /* ignore */
+      }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [activeOrder, canPayNow, dispatch]);
 
   if (!resumeReady) {
     return (
@@ -374,6 +393,15 @@ const OrderScreen = () => {
             </div>
           )}
 
+          {!activeCustomer && (
+            <div className="rounded-lg border border-dashed border-primary/30 bg-muted/30 px-3 py-3 text-center space-y-2">
+              <p className="text-xs text-muted-foreground">Select who is dining before sending the order to the kitchen.</p>
+              <Button type="button" size="sm" className="w-full" onClick={() => setCustomerDialogOpen(true)}>
+                Select customer
+              </Button>
+            </div>
+          )}
+
           {activeCustomer && (
             <div className="rounded-lg border bg-muted/40 px-3 py-2 flex items-start justify-between gap-2">
               <div className="flex gap-2 min-w-0">
@@ -395,7 +423,7 @@ const OrderScreen = () => {
                   variant="link"
                   size="sm"
                   className="text-xs shrink-0 h-auto p-0"
-                  onClick={() => navigate(`/pos/table/${tableId}/customer`)}
+                  onClick={() => setCustomerDialogOpen(true)}
                 >
                   Change
                 </Button>
@@ -503,7 +531,15 @@ const OrderScreen = () => {
             </Button>
 
             {unpaid && (
-              <Button type="button" variant="secondary" className="w-full gap-2" size="lg" onClick={handlePayNow}>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full gap-2"
+                size="lg"
+                onClick={handlePayNow}
+                disabled={!canPayNow}
+                title={!canPayNow ? 'Every item must be completed in the kitchen before payment.' : undefined}
+              >
                 <CreditCard className="h-4 w-4" />
                 Pay now ({formatCurrency(total)})
               </Button>
@@ -511,6 +547,12 @@ const OrderScreen = () => {
           </div>
         )}
       </div>
+
+      <CustomerSelectDialog
+        open={customerDialogOpen}
+        onOpenChange={setCustomerDialogOpen}
+        tableLabel={activeTable ? `Table ${activeTable.tableNumber}` : 'Table'}
+      />
     </div>
   );
 };

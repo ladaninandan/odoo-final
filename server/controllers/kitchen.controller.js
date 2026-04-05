@@ -1,4 +1,5 @@
 import Order from '../models/Order.js';
+import { populateOrderDetail } from '../utils/populateOrder.js';
 
 const STAGE_FLOW = {
   to_cook: 'preparing',
@@ -93,7 +94,8 @@ export const advanceOrderStage = async (req, res) => {
     io.to('pos').emit('kitchen:stage_update', { orderId: order._id, stage: newStage || 'completed' });
     io.to('customer').emit('order:status_update', { orderId: order._id, status: allCompleted ? 'ready' : newStage });
 
-    res.json(order);
+    const out = await populateOrderDetail(Order.findById(order._id));
+    res.json(out);
   } catch (err) {
     res.status(400).json({ message: 'Failed to advance order stage', error: err.message });
   }
@@ -121,7 +123,8 @@ export const markItemPrepared = async (req, res) => {
     const io = req.app.get('io');
     io.to('pos').emit('order:item_prepared', { orderId: order._id, itemId });
 
-    res.json(order);
+    const out = await populateOrderDetail(Order.findById(order._id));
+    res.json(out);
   } catch (err) {
     res.status(400).json({ message: 'Failed to mark item prepared', error: err.message });
   }

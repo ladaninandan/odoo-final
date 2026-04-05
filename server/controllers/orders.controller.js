@@ -3,7 +3,8 @@ import Order from '../models/Order.js';
 import Table from '../models/Table.js';
 import Customer from '../models/Customer.js';
 import generateOrderNumber from '../utils/generateOrderNumber.js';
-import { releaseTableForOrder } from '../utils/releaseTable.js';
+import { orderReadyForPayment, releaseTableForOrder } from '../utils/releaseTable.js';
+import { populateOrderDetail } from '../utils/populateOrder.js';
 
 /** Normalize id from JSON (string or { _id }) */
 function idString(id) {
@@ -28,20 +29,7 @@ export const getOrders = async (req, res) => {
 
     const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 1000);
 
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'table',
-        select: 'tableNumber floor status',
-        populate: { path: 'floor', select: 'name' },
-      })
-      .populate('customer', 'name phone mobile email address city state country notes')
-      .populate('createdBy', 'first_name last_name email')
-      .populate('session', 'status openedAt closedAt openingBalance totalSales')
-      .populate({
-        path: 'items.product',
-        select: 'name price image unit category taxRate',
-        populate: { path: 'category', select: 'name' },
-      })
+    const orders = await populateOrderDetail(Order.find(filter))
       .sort({ createdAt: -1 })
       .limit(lim);
     res.json(orders);
@@ -52,15 +40,7 @@ export const getOrders = async (req, res) => {
 
 export const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate({
-        path: 'table',
-        select: 'tableNumber floor status',
-        populate: { path: 'floor', select: 'name' },
-      })
-      .populate('customer', 'name phone mobile email address city state country')
-      .populate('createdBy', 'first_name last_name')
-      .populate('items.product', 'name price image');
+    const order = await populateOrderDetail(Order.findById(req.params.id));
     if (!order) return res.status(404).json({ message: 'Order not found' });
     res.json(order);
   } catch (err) {
@@ -226,7 +206,8 @@ export const updateOrder = async (req, res) => {
     if (notes !== undefined) order.notes = notes;
 
     await order.save();
-    res.json(order);
+    const out = await populateOrderDetail(Order.findById(order._id));
+    res.json(out);
   } catch (err) {
     res.status(400).json({ message: 'Failed to update order', error: err.message });
   }
@@ -234,7 +215,7 @@ export const updateOrder = async (req, res) => {
 
 export const sendToKitchen = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).populate('table', 'tableNumber');
+    const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     order.status = 'sent_to_kitchen';
@@ -245,9 +226,11 @@ export const sendToKitchen = async (req, res) => {
     });
     await order.save();
 
-    // Emit to Kitchen Display + Customer Display (full order for second screen)
+    const populated = await populateOrderDetail(Order.findById(order._id));
+    const orderPayload = populated.toObject();
+
+    // Emit to Kitchen Display + Customer Display (same shape as GET /orders/:id)
     const io = req.app.get('io');
-    const orderPayload = order.toObject();
     io.to('kitchen').emit('order:new', orderPayload);
     io.to('kitchen').emit('order:updated', orderPayload);
     io.to('customer').emit('customer:set_order', orderPayload);
@@ -256,7 +239,7 @@ export const sendToKitchen = async (req, res) => {
       status: 'sent_to_kitchen',
     });
 
-    res.json(order);
+    res.json(populated);
   } catch (err) {
     res.status(400).json({ message: 'Failed to send order to kitchen', error: err.message });
   }
@@ -265,6 +248,15 @@ export const sendToKitchen = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    const existing = await Order.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Order not found' });
+
+    if (status === 'paid' && !orderReadyForPayment(existing)) {
+      return res.status(400).json({
+        message: 'Cannot mark as paid until every item is completed in the kitchen.',
+      });
+    }
+
     const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
@@ -275,7 +267,8 @@ export const updateOrderStatus = async (req, res) => {
       await releaseTableForOrder(order, io);
     }
 
-    res.json(order);
+    const out = await populateOrderDetail(Order.findById(order._id));
+    res.json(out);
   } catch (err) {
     res.status(400).json({ message: 'Failed to update order status', error: err.message });
   }
@@ -291,7 +284,8 @@ export const cancelOrder = async (req, res) => {
       await releaseTableForOrder(order, io);
     }
 
-    res.json({ message: 'Order cancelled', order });
+    const populated = await populateOrderDetail(Order.findById(order._id));
+    res.json({ message: 'Order cancelled', order: populated });
   } catch (err) {
     res.status(500).json({ message: 'Failed to cancel order', error: err.message });
   }

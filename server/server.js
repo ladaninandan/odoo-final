@@ -31,8 +31,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Connect to MongoDB
-connectDB();
+process.on('unhandledRejection', (reason, p) => {
+  console.error('[unhandledRejection]', reason, p);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
 
 const app = express();
 const httpServer = createServer(app);
@@ -65,11 +69,25 @@ app.use(cookieParser());
 // Security HTTP Headers
 app.use(helmet());
 
-// Rate Limiting
+// Rate limiting — default 200/15min is too low for SPAs that poll (e.g. payment screen every 4s).
+// Override with API_RATE_LIMIT_MAX in .env if needed.
+const apiRateLimitMax = (() => {
+  const raw = process.env.API_RATE_LIMIT_MAX;
+  if (raw != null && raw !== '') {
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && n > 0) return n;
+  }
+  return isProd ? 800 : 5000;
+})();
+
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    message: 'Too many requests from this IP, please try again after 15 minutes.'
+  windowMs: 15 * 60 * 1000,
+  max: apiRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: 'Too many requests from this IP. Please wait a few minutes or increase API_RATE_LIMIT_MAX.',
+  },
 });
 app.use('/api/', limiter);
 
@@ -107,6 +125,19 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} (HTTP + Socket.IO), bound to 0.0.0.0 — reachable on LAN`);
-});
+async function start() {
+  try {
+    await connectDB();
+  } catch (e) {
+    console.error('Database bootstrap failed', e);
+    process.exit(1);
+    return;
+  }
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT} (HTTP + Socket.IO), bound to 0.0.0.0 — reachable on LAN`);
+    console.log(`API rate limit: ${apiRateLimitMax} requests / 15 min per IP (set API_RATE_LIMIT_MAX to change)`);
+  });
+}
+
+start();

@@ -20,7 +20,7 @@ const TopMenu = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { user, isAdmin } = useAuth();
-  const { activeTable, activeOrder, items: cartItems } = useSelector((state) => state.cart);
+  const { activeTable } = useSelector((state) => state.cart);
   const { current: session } = useSelector((state) => state.session);
 
   const handleLogout = async () => {
@@ -31,28 +31,12 @@ const TopMenu = () => {
 
   const orderMatch = location.pathname.match(/^\/pos\/order\/([^/]+)/);
   const paymentMatch = location.pathname.includes('/pos/payment/');
-  const customerMatch = location.pathname.match(/^\/pos\/table\/([^/]+)\/customer/);
 
   const handlePosBack = () => {
-    if (customerMatch) navigate('/pos/floor');
-    else if (orderMatch) {
-      const tableId = orderMatch[1];
-      const tableMatches = activeTable && String(activeTable._id) === String(tableId);
-      const orderMatchesTable =
-        tableMatches &&
-        activeOrder &&
-        String(activeTable.currentOrder?._id ?? activeTable.currentOrder ?? '') === String(activeOrder);
-      const fromOccupiedTable =
-        location.state?.fromOccupiedTable === true ||
-        (tableMatches && cartItems.some((i) => i.locked)) ||
-        (tableMatches && activeTable.status === 'occupied' && orderMatchesTable);
-      if (fromOccupiedTable) navigate('/pos/floor');
-      else navigate(`/pos/table/${tableId}/customer`);
-    } else if (paymentMatch) navigate('/pos/floor');
-    else navigate('/pos/floor');
+    navigate('/pos/floor');
   };
 
-  const showPosBack = Boolean(customerMatch || orderMatch || paymentMatch);
+  const showPosBack = Boolean(orderMatch || paymentMatch);
 
   return (
     <header className="h-14 bg-card border-b flex items-center justify-between px-4 shrink-0">

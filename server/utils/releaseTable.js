@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Table from '../models/Table.js';
 import SelfOrderLink from '../models/SelfOrderLink.js';
 
@@ -7,14 +8,43 @@ export const allKitchenItemsComplete = (order) => {
   return order.items.every((i) => i.kitchenStatus === 'completed');
 };
 
+/** True when the bill can be taken: every line has reached the final kitchen stage. */
+export function orderReadyForPayment(order) {
+  if (!order?.items?.length) return false;
+  return order.items.every((i) => i.kitchenStatus === 'completed');
+}
+
+/** Normalize populated ref or id string to ObjectId for consistent DB queries. */
+export function resolveTableObjectId(tableRef) {
+  if (tableRef == null) return null;
+  const raw = tableRef._id != null ? tableRef._id : tableRef;
+  const s = String(raw);
+  return mongoose.isValidObjectId(s) ? new mongoose.Types.ObjectId(s) : null;
+}
+
 /**
  * Invalidate self-order QR links for a table so the next guest must use a newly generated QR.
  * Call whenever the table becomes available (payment, cancel, manual free).
  */
 export async function invalidateSelfOrderLinksForTable(tableId) {
-  if (!tableId) return;
-  const id = tableId._id != null ? tableId._id : tableId;
-  await SelfOrderLink.updateMany({ tableId: id }, { $set: { active: false } });
+  const oid = resolveTableObjectId(tableId);
+  if (!oid) return;
+  await SelfOrderLink.updateMany({ tableId: oid }, { $set: { active: false } });
+}
+
+/**
+ * Deactivate the exact link used for this order (covers edge cases where tableId on the link
+ * does not match the order’s table ref format).
+ */
+export async function invalidateSelfOrderLinkByToken(token) {
+  if (token == null || token === '') return;
+  const t = String(token).trim();
+  if (!t) return;
+  // Match stored casing (links are usually uppercase; tolerate legacy rows)
+  await SelfOrderLink.updateMany(
+    { token: { $regex: new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+    { $set: { active: false } }
+  );
 }
 
 /**
@@ -22,13 +52,16 @@ export async function invalidateSelfOrderLinksForTable(tableId) {
  * (not when payment alone is taken).
  */
 export const releaseTableForOrder = async (order, io) => {
-  const tableId = order.table;
-  if (!tableId) return;
+  const tableOid = resolveTableObjectId(order.table);
+  if (!tableOid) return;
 
-  await Table.findByIdAndUpdate(tableId, { status: 'available', currentOrder: null });
-  await invalidateSelfOrderLinksForTable(tableId);
+  await Table.findByIdAndUpdate(tableOid, { status: 'available', currentOrder: null });
+  await invalidateSelfOrderLinksForTable(tableOid);
+  if (order.selfOrderToken) {
+    await invalidateSelfOrderLinkByToken(order.selfOrderToken);
+  }
 
   if (io) {
-    io.to('pos').emit('table:status_update', { tableId: String(tableId), status: 'available' });
+    io.to('pos').emit('table:status_update', { tableId: String(tableOid), status: 'available' });
   }
 };

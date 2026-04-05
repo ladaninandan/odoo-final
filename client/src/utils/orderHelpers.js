@@ -137,3 +137,29 @@ export const getEffectiveTaxRatePercent = (order) => {
   if (sub <= 0) return null;
   return parseFloat(((tax / sub) * 100).toFixed(2));
 };
+
+/** Every line is sent to the kitchen and marked completed (matches server payment check). */
+export const orderKitchenReadyForPayment = (order) => {
+  if (!order?.items?.length) return false;
+  return order.items.every((i) => i.kitchenStatus === 'completed');
+};
+
+/**
+ * Payment screen: do not show "In Kitchen" once every line is completed,
+ * even if `order.status` is still `sent_to_kitchen` (race or stale client).
+ */
+export const getOrderStatusLabelForPayment = (order) => {
+  if (!order) return '';
+  if (order.status === 'paid') return 'Paid';
+  if (order.status === 'cancelled') return 'Cancelled';
+  if (orderKitchenReadyForPayment(order) || order.status === 'ready') return 'Ready';
+  return getStatusLabel(order.status);
+};
+
+export const getOrderStatusVariantForPayment = (order) => {
+  if (!order) return 'secondary';
+  if (order.status === 'paid') return 'default';
+  if (order.status === 'cancelled') return 'destructive';
+  if (orderKitchenReadyForPayment(order) || order.status === 'ready') return 'success';
+  return getStatusVariant(order.status);
+};

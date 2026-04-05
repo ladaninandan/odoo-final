@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { initiatePayment, confirmPayment, selectMethod, resetPayment } from '../../store/slices/paymentSlice';
+import {
+  initiatePayment,
+  confirmPayment,
+  selectMethod,
+  resetPayment,
+  fetchPaymentMethods,
+} from '../../store/slices/paymentSlice';
 import { clearCart } from '../../store/slices/cartSlice';
 import { setCurrentOrder } from '../../store/slices/ordersSlice';
 import { fetchFloors } from '../../store/slices/floorsSlice';
@@ -12,30 +18,61 @@ import { Badge } from '../ui/Badge';
 import { Separator } from '../ui/Separator';
 import { formatCurrency } from '../../utils/formatCurrency';
 import {
-  getStatusLabel,
-  getStatusVariant,
   allocateOrderTaxAcrossLines,
   getEffectiveTaxRatePercent,
+  orderKitchenReadyForPayment,
+  getKitchenStageLabel,
+  getOrderStatusLabelForPayment,
+  getOrderStatusVariantForPayment,
 } from '../../utils/orderHelpers';
 import {
-  Banknote, CreditCard, Smartphone, QrCode, CheckCircle2, Loader2, ArrowLeft,
+  Banknote, CreditCard, Smartphone, CheckCircle2, Loader2, ArrowLeft, AlertCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const methods = [
-  { id: 'cash', label: 'Cash', icon: Banknote, color: 'bg-green-500/10 text-green-700 border-green-500/30' },
-  { id: 'digital', label: 'Digital', icon: CreditCard, color: 'bg-blue-500/10 text-blue-700 border-blue-500/30' },
-  { id: 'upi', label: 'UPI', icon: Smartphone, color: 'bg-purple-500/10 text-purple-700 border-purple-500/30' },
-];
+const METHOD_META = {
+  cash: { label: 'Cash', icon: Banknote, color: 'bg-green-500/10 text-green-700 border-green-500/30' },
+  digital: { label: 'Digital', icon: CreditCard, color: 'bg-blue-500/10 text-blue-700 border-blue-500/30' },
+  upi: { label: 'UPI', icon: Smartphone, color: 'bg-purple-500/10 text-purple-700 border-purple-500/30' },
+};
 
 const PaymentScreen = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { selectedMethod, activePayment, qrCode, status } = useSelector((state) => state.payment);
+  const { selectedMethod, activePayment, qrCode, status, enabledMethods: methodsFromApi } = useSelector(
+    (state) => state.payment
+  );
   const { currentOrder } = useSelector((state) => state.orders);
   const { total } = useSelector((state) => state.cart);
   const [processing, setProcessing] = useState(false);
+  const [paymentMethodsLoaded, setPaymentMethodsLoaded] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchPaymentMethods())
+      .unwrap()
+      .catch(() => toast.error('Could not load payment methods'))
+      .finally(() => setPaymentMethodsLoaded(true));
+  }, [dispatch]);
+
+  const enabledPaymentOptions = useMemo(() => {
+    if (!methodsFromApi?.length) return [];
+    return methodsFromApi
+      .filter((m) => m.isEnabled)
+      .map((m) => {
+        const meta = METHOD_META[m.type];
+        if (!meta) return null;
+        return { id: m.type, ...meta };
+      })
+      .filter(Boolean);
+  }, [methodsFromApi]);
+
+  useEffect(() => {
+    if (!selectedMethod) return;
+    if (!enabledPaymentOptions.some((m) => m.id === selectedMethod)) {
+      dispatch(selectMethod(null));
+    }
+  }, [enabledPaymentOptions, selectedMethod, dispatch]);
 
   useEffect(() => {
     if (!orderId) return;
@@ -49,6 +86,24 @@ const PaymentScreen = () => {
       }
     })();
   }, [orderId, dispatch, navigate]);
+
+  const kitchenReady = useMemo(
+    () => orderKitchenReadyForPayment(currentOrder),
+    [currentOrder]
+  );
+
+  useEffect(() => {
+    if (!orderId || kitchenReady) return undefined;
+    const t = setInterval(async () => {
+      try {
+        const { data } = await ordersApi.getById(orderId);
+        dispatch(setCurrentOrder(data));
+      } catch {
+        /* ignore */
+      }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [orderId, kitchenReady, dispatch]);
 
   const orderTotal = currentOrder?.total ?? total;
 
@@ -64,6 +119,10 @@ const PaymentScreen = () => {
 
   const handlePay = async () => {
     if (!selectedMethod) return toast.error('Select a payment method');
+    if (!kitchenReady) {
+      toast.error('Every item must be completed in the kitchen before payment.');
+      return;
+    }
     setProcessing(true);
     try {
       const payment = await dispatch(initiatePayment({
@@ -93,6 +152,10 @@ const PaymentScreen = () => {
 
   const handleConfirmUPI = async () => {
     if (!activePayment) return;
+    if (!kitchenReady) {
+      toast.error('Every item must be completed in the kitchen before payment.');
+      return;
+    }
     setProcessing(true);
     try {
       await dispatch(confirmPayment(activePayment._id)).unwrap();
@@ -134,8 +197,8 @@ const PaymentScreen = () => {
               <div className="mt-1 space-y-0.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{currentOrder.orderNumber}</span>
-                  <Badge variant={getStatusVariant(currentOrder.status)} className="text-xs">
-                    {getStatusLabel(currentOrder.status)}
+                  <Badge variant={getOrderStatusVariantForPayment(currentOrder)} className="text-xs">
+                    {getOrderStatusLabelForPayment(currentOrder)}
                   </Badge>
                 </div>
                 {currentOrder.customer?.name && (
@@ -151,6 +214,18 @@ const PaymentScreen = () => {
             )}
           </div>
         </div>
+
+        {!kitchenReady && currentOrder?.items?.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex gap-3 text-sm">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <p className="font-medium text-amber-950 dark:text-amber-100">Kitchen not finished</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Payment is disabled until every line is marked completed in the kitchen. This screen refreshes every few seconds.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Order summary */}
         <Card className="overflow-hidden">
@@ -229,6 +304,9 @@ const PaymentScreen = () => {
                           {item.variant ? (
                             <div className="text-xs text-muted-foreground mt-0.5">{item.variant}</div>
                           ) : null}
+                          <div className="text-[10px] text-muted-foreground mt-0.5 capitalize">
+                            Kitchen: {getKitchenStageLabel(item.kitchenStatus)}
+                          </div>
                         </td>
                         <td className="p-2 text-right align-top tabular-nums">{item.quantity}</td>
                         <td className="p-2 text-right align-top tabular-nums whitespace-nowrap">
@@ -280,21 +358,39 @@ const PaymentScreen = () => {
 
         {/* Method Selection */}
         {!qrCode && (
-          <div className="grid grid-cols-3 gap-3">
-            {methods.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => handleSelectMethod(m.id)}
-                className={`p-4 rounded-lg border-2 transition-all text-center ${
-                  selectedMethod === m.id
-                    ? 'border-primary bg-primary/5 scale-105 shadow-md'
-                    : `${m.color} hover:scale-102`
-                }`}
-              >
-                <m.icon className="h-8 w-8 mx-auto mb-2" />
-                <span className="text-sm font-medium">{m.label}</span>
-              </button>
-            ))}
+          <div className="space-y-2">
+            {!paymentMethodsLoaded ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Loading payment methods…</p>
+            ) : enabledPaymentOptions.length === 0 ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex gap-3 text-sm">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-700" />
+                <div>
+                  <p className="font-medium text-amber-950 dark:text-amber-100">No payment methods enabled</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Turn on at least one method in Admin → POS settings, then return here.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
+                {enabledPaymentOptions.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={!kitchenReady}
+                    onClick={() => kitchenReady && handleSelectMethod(m.id)}
+                    className={`p-4 rounded-lg border-2 transition-all text-center disabled:opacity-40 disabled:pointer-events-none ${
+                      selectedMethod === m.id
+                        ? 'border-primary bg-primary/5 scale-105 shadow-md'
+                        : `${m.color} hover:scale-102`
+                    }`}
+                  >
+                    <m.icon className="h-8 w-8 mx-auto mb-2" />
+                    <span className="text-sm font-medium">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -310,7 +406,7 @@ const PaymentScreen = () => {
               </div>
             </CardContent>
             <CardFooter className="justify-center">
-              <Button onClick={handleConfirmUPI} disabled={processing} variant="success" className="gap-2">
+              <Button onClick={handleConfirmUPI} disabled={processing || !kitchenReady} variant="success" className="gap-2">
                 {processing && <Loader2 className="h-4 w-4 animate-spin" />}
                 <CheckCircle2 className="h-4 w-4" />
                 Confirm Payment Received
@@ -325,7 +421,13 @@ const PaymentScreen = () => {
             className="w-full gap-2"
             size="lg"
             onClick={handlePay}
-            disabled={!selectedMethod || processing}
+            disabled={
+              !selectedMethod ||
+              processing ||
+              !kitchenReady ||
+              !paymentMethodsLoaded ||
+              enabledPaymentOptions.length === 0
+            }
           >
             {processing && <Loader2 className="h-4 w-4 animate-spin" />}
             Pay {formatCurrency(orderTotal)}

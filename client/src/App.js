@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Login from './features/auth/Login';
 import Register from './features/auth/Register';
@@ -15,7 +15,6 @@ import AdminLayout from './components/layout/AdminLayout';
 import SelfOrderLayout from './components/selforder/SelfOrderLayout';
 
 // POS screens
-import TableCustomerScreen from './components/pos/TableCustomerScreen';
 import FloorPlan from './components/pos/FloorPlan';
 import OrderScreen from './components/pos/OrderScreen';
 import PaymentScreen from './components/pos/PaymentScreen';
@@ -56,6 +55,12 @@ const RoleRedirect = () => {
   return <Navigate to="/login" replace />;
 };
 
+/** Old bookmarked URLs: /pos/table/:id/customer → order screen */
+function RedirectTableCustomerToOrder() {
+  const { tableId } = useParams();
+  return <Navigate to={`/pos/order/${tableId}`} replace />;
+}
+
 function App() {
   return (
     <Router>
@@ -86,7 +91,7 @@ function App() {
             <Route path="/pos" element={<POSLayout />}>
               <Route index element={<Navigate to="floor" replace />} />
               <Route path="floor" element={<FloorPlan />} />
-              <Route path="table/:tableId/customer" element={<TableCustomerScreen />} />
+              <Route path="table/:tableId/customer" element={<RedirectTableCustomerToOrder />} />
               <Route path="customers" element={<CustomerList />} />
               <Route path="order/:tableId" element={<OrderScreen />} />
               <Route path="payment/:orderId" element={<PaymentScreen />} />
