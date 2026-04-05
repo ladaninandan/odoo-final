@@ -55,12 +55,12 @@ const Register = () => {
         <div className="w-full max-w-[420px] mx-auto py-10">
 
           <div className="text-left md:text-center mb-8 animate-slide-up-1">
-            <h2 className="text-[1.8rem] font-bold text-[#4E342E] tracking-tight leading-tight mb-2">
+            <h2 className="text-[1.8rem] font-bold text-foreground tracking-tight leading-tight mb-2">
               Join Odoo POS Cafe
             </h2>
-            <p className="text-[#8D6E63] text-[0.9rem] font-medium">
+            <p className="text-muted-foreground text-[0.9rem] font-medium">
               Create your pos terminal account
-            </p>gf
+            </p>
           </div>
 
           {errors.global && (
@@ -78,7 +78,7 @@ const Register = () => {
                 placeholder="Pam Beesly"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className={`w-full border ${errors.name ? 'border-red-400' : 'border-gray-200'} rounded-[0.5rem] p-3 text-[0.95rem] text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all`}
+                className={`w-full border ${errors.name ? 'border-red-400' : 'border-border'} rounded-[0.5rem] p-3 text-[0.95rem] text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all`}
               />
               {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name}</p>}
             </div>
@@ -91,7 +91,7 @@ const Register = () => {
                 placeholder="admin@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full border ${errors.email ? 'border-red-400' : 'border-gray-200'} rounded-[0.5rem] p-3 text-[0.95rem] text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all`}
+                className={`w-full border ${errors.email ? 'border-red-400' : 'border-border'} rounded-[0.5rem] p-3 text-[0.95rem] text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all`}
               />
               {errors.email && <p className="text-red-500 text-xs mt-1 font-medium">{errors.email}</p>}
             </div>
@@ -104,7 +104,7 @@ const Register = () => {
                 placeholder="+1 234 567 8900"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className={`w-full border ${errors.phone ? 'border-red-400' : 'border-gray-200'} rounded-[0.5rem] p-3 text-[0.95rem] text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all`}
+                className={`w-full border ${errors.phone ? 'border-red-400' : 'border-border'} rounded-[0.5rem] p-3 text-[0.95rem] text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all`}
               />
               {errors.phone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.phone}</p>}
             </div>
@@ -118,9 +118,9 @@ const Register = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full border ${errors.password ? 'border-red-400' : 'border-gray-200'} rounded-[0.5rem] p-3 text-[0.95rem] ${!showPassword ? 'tracking-[0.2em]' : ''} text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all pr-12`}
+                  className={`w-full border ${errors.password ? 'border-red-400' : 'border-border'} rounded-[0.5rem] p-3 text-[0.95rem] ${!showPassword ? 'tracking-[0.2em]' : ''} text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all pr-12`}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-900 outline-none transition-colors">
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 px-3 flex items-center text-muted-foreground hover:text-foreground outline-none transition-colors">
                   {showPassword ? (
                     <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   ) : (
@@ -140,9 +140,9 @@ const Register = () => {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full border ${errors.confirmPassword ? 'border-red-400' : 'border-gray-200'} rounded-[0.5rem] p-3 text-[0.95rem] ${!showConfirmPassword ? 'tracking-[0.2em]' : ''} text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all pr-12`}
+                  className={`w-full border ${errors.confirmPassword ? 'border-red-400' : 'border-border'} rounded-[0.5rem] p-3 text-[0.95rem] ${!showConfirmPassword ? 'tracking-[0.2em]' : ''} text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all pr-12`}
                 />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-900 outline-none transition-colors">
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 px-3 flex items-center text-muted-foreground hover:text-foreground outline-none transition-colors">
                   {showConfirmPassword ? (
                     <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   ) : (
@@ -158,7 +158,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-full bg-[#5D4037] hover:bg-[#3E2723] text-white font-semibold rounded-[0.5rem] py-3.5 text-[0.95rem] transition-colors disabled:opacity-80 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-2`}
+                className={`w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-[0.5rem] py-3.5 text-[0.95rem] transition-colors disabled:opacity-80 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-2`}
               >
                 {isLoading ? (
                   <>
@@ -188,15 +188,15 @@ const Register = () => {
             <button
               type="button"
               onClick={handleGoogleSignup}
-              className="w-full border border-[#E0D4C8] rounded-[0.5rem] py-3 flex items-center justify-center gap-3 text-[0.9rem] font-semibold text-[#4E342E] hover:bg-[#FAF8F5] transition-colors active:bg-[#EFEBE6]"
+              className="w-full border border-border rounded-[0.5rem] py-3 flex items-center justify-center gap-3 text-[0.9rem] font-semibold text-foreground hover:bg-secondary/50 transition-colors active:bg-secondary"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-[1.1rem] h-[1.1rem]" />
               Sign up with Google
             </button>
 
-            <p className="mt-8 text-center text-[0.8rem] text-[#8D6E63] font-medium">
+            <p className="mt-8 text-center text-[0.8rem] text-muted-foreground font-medium">
               Already have an account?{' '}
-              <Link to="/login" className="text-[#5D4037] font-bold ml-1 hover:underline">
+              <Link to="/login" className="text-primary font-bold ml-1 hover:underline">
                 Log in
               </Link>
             </p>
@@ -206,7 +206,7 @@ const Register = () => {
       </div>
 
       {/* Right Side: Testimonial/Hero Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#4E342E] border-l border-[#E0D4C8] overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 border-l border-border overflow-hidden">
         <img
           ref={imageRef}
           src="https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&q=80&w=2000"
@@ -233,10 +233,10 @@ const Register = () => {
               <p className="text-xs text-gray-300 mt-1 font-medium">Restaurant Owner</p>
             </div>
             <div className="flex gap-4">
-              <button className="text-white hover:text-[#E8C39E] transition-colors p-2 cursor-pointer outline-none">
+              <button className="text-white hover:text-blue-300 transition-colors p-2 cursor-pointer outline-none">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
-              <button className="text-white hover:text-[#E8C39E] transition-colors p-2 cursor-pointer outline-none">
+              <button className="text-white hover:text-blue-300 transition-colors p-2 cursor-pointer outline-none">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
