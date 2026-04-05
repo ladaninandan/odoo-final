@@ -15,10 +15,12 @@ const reportsSlice = createSlice({
   name: 'reports',
   initialState: {
     dashboard: null,
-    salesData: [],
+    salesData: null,
     filters: { period: 'today' },
     isLoading: false,
     error: null,
+    salesLoading: false,
+    salesError: null,
   },
   reducers: {
     setFilters: (state, { payload }) => { state.filters = { ...state.filters, ...payload }; },
@@ -38,7 +40,19 @@ const reportsSlice = createSlice({
         state.isLoading = false;
         state.error = payload || 'Failed to load dashboard';
       })
-      .addCase(fetchSalesReport.fulfilled, (state, { payload }) => { state.salesData = payload; });
+      .addCase(fetchSalesReport.pending, (state) => {
+        state.salesLoading = true;
+        state.salesError = null;
+      })
+      .addCase(fetchSalesReport.fulfilled, (state, { payload }) => {
+        state.salesData = payload;
+        state.salesLoading = false;
+        state.salesError = null;
+      })
+      .addCase(fetchSalesReport.rejected, (state, { payload }) => {
+        state.salesLoading = false;
+        state.salesError = payload || 'Failed to load sales report';
+      });
   },
 });
 

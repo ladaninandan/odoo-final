@@ -7,10 +7,8 @@ import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Skeleton } from '../ui/Skeleton';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { getServerOrigin } from '../../utils/lanServerUrl';
+import { getMediaAbsoluteUrl } from '../../utils/lanServerUrl';
 import { ArrowLeft, Plus, Minus, Package } from 'lucide-react';
-
-const API_URL = getServerOrigin();
 
 const SelfOrderProductDetail = () => {
   const { token, productId } = useParams();
@@ -82,7 +80,7 @@ const SelfOrderProductDetail = () => {
           <div className="aspect-[4/3] sm:aspect-[16/9] max-h-[min(56vh,420px)] bg-muted w-full overflow-hidden flex items-center justify-center">
             {product.image ? (
               <img
-                src={`${API_URL}${product.image}`}
+                src={getMediaAbsoluteUrl(product.image)}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />

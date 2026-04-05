@@ -1,5 +1,26 @@
 import Product from '../models/Product.js';
 
+/** Multer fields arrive as strings — coerce for Mongoose */
+function coerceProductBody(body) {
+  if (!body || typeof body !== 'object') return body;
+  const out = { ...body };
+  if (out.price !== undefined && out.price !== '') {
+    const n = Number(out.price);
+    if (!Number.isNaN(n)) out.price = n;
+  }
+  if (out.taxRate !== undefined && out.taxRate !== '') {
+    const n = Number(out.taxRate);
+    if (!Number.isNaN(n)) out.taxRate = n;
+  }
+  if (out.sendToKitchen !== undefined) {
+    out.sendToKitchen = out.sendToKitchen === true || out.sendToKitchen === 'true';
+  }
+  if (out.isActive !== undefined) {
+    out.isActive = out.isActive === true || out.isActive === 'true';
+  }
+  return out;
+}
+
 export const getProducts = async (req, res) => {
   try {
     const { category, active, search } = req.query;
@@ -29,7 +50,7 @@ export const getProductById = async (req, res) => {
 
 export const createProduct = async (req, res) => {
   try {
-    const productData = { ...req.body };
+    const productData = coerceProductBody({ ...req.body });
     if (req.file) {
       productData.image = `/uploads/${req.file.filename}`;
     }
@@ -46,7 +67,7 @@ export const createProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const updateData = coerceProductBody({ ...req.body });
     if (req.file) {
       updateData.image = `/uploads/${req.file.filename}`;
     }

@@ -9,8 +9,9 @@ import { cn } from '../../lib/utils';
 import {
   LayoutDashboard, Package, Grid3X3, Armchair,
   Clock, BarChart3, Settings, LogOut, ChevronLeft, Users, UserCircle,
-  ShoppingBag,
+  ShoppingBag, Sun, Moon,
 } from 'lucide-react';
+import { useAdminTheme } from '../../hooks/useAdminTheme';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
@@ -25,10 +26,11 @@ const navItems = [
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ theme, onThemeToggle }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user } = useAuth();
+  const isDark = theme === 'dark';
 
   const handleLogout = async () => {
     try { await authApi.logout(); } catch {}
@@ -37,10 +39,21 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-card border-r flex flex-col h-full">
-      <div className="p-4 border-b">
-        <h1 className="text-lg font-bold text-primary">Odoo POS Cafe</h1>
-        <p className="text-xs text-muted-foreground">Admin Panel</p>
+    <aside className="w-64 bg-card border-r border-border flex flex-col h-full">
+      <div className="p-4 border-b border-border flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold text-primary">Odoo POS Cafe</h1>
+          <p className="text-xs text-muted-foreground">Admin Panel</p>
+        </div>
+        <button
+          type="button"
+          onClick={onThemeToggle}
+          className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={isDark ? 'Light mode' : 'Dark mode'}
+        >
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-auto">
@@ -64,7 +77,7 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="p-3 border-t space-y-2">
+      <div className="p-3 border-t border-border space-y-2">
         <button
           onClick={() => navigate('/pos/floor')}
           className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent w-full transition-colors"
@@ -87,9 +100,16 @@ const Sidebar = () => {
 };
 
 const AdminLayout = () => {
+  const { theme, isDark, toggle } = useAdminTheme();
+
   return (
-    <div className="h-screen flex bg-background">
-      <Sidebar />
+    <div
+      className={cn(
+        'h-screen flex bg-background text-foreground',
+        isDark && 'dark',
+      )}
+    >
+      <Sidebar theme={theme} onThemeToggle={toggle} />
       <main className="flex-1 overflow-auto p-6">
         <Outlet />
       </main>

@@ -33,3 +33,17 @@ export function getApiBaseUrl() {
 export function getSocketUrl() {
   return getServerOrigin();
 }
+
+/**
+ * Absolute URL for stored media paths (`/uploads/...`) or an already-absolute URL.
+ * Use for <img src> when the API is on another origin (e.g. :5000 vs CRA :3000).
+ */
+export function getMediaAbsoluteUrl(storagePath) {
+  if (storagePath == null || storagePath === '') return '';
+  const s = String(storagePath).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  const base = getServerOrigin().replace(/\/$/, '');
+  const pathPart = s.startsWith('/') ? s : `/${s}`;
+  return `${base}${pathPart}`;
+}

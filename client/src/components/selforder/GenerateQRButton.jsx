@@ -9,8 +9,9 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, Copy, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { cn } from '../../lib/utils';
 
-const GenerateQRButton = ({ tableId, tableNumber }) => {
+const GenerateQRButton = ({ tableId, tableNumber, className }) => {
   const [open, setOpen] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,13 @@ const GenerateQRButton = ({ tableId, tableNumber }) => {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleGenerate} disabled={loading} className="gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleGenerate}
+        disabled={loading}
+        className={cn('gap-1', className)}
+      >
         {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <QrCode className="h-3 w-3" />}
         QR
       </Button>

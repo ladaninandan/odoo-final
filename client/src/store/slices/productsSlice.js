@@ -12,14 +12,19 @@ export const fetchCategories = createAsyncThunk('products/fetchCategories', asyn
   catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to fetch categories'); }
 });
 
+function productErrorMessage(err, fallback) {
+  const d = err.response?.data;
+  return d?.error || d?.message || fallback;
+}
+
 export const createProduct = createAsyncThunk('products/create', async (formData, { rejectWithValue }) => {
   try { const { data } = await productsApi.create(formData); return data; }
-  catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to create product'); }
+  catch (err) { return rejectWithValue(productErrorMessage(err, 'Failed to create product')); }
 });
 
 export const updateProduct = createAsyncThunk('products/update', async ({ id, formData }, { rejectWithValue }) => {
   try { const { data } = await productsApi.update(id, formData); return data; }
-  catch (err) { return rejectWithValue(err.response?.data?.message || 'Failed to update product'); }
+  catch (err) { return rejectWithValue(productErrorMessage(err, 'Failed to update product')); }
 });
 
 export const deleteProduct = createAsyncThunk('products/delete', async (id, { rejectWithValue }) => {

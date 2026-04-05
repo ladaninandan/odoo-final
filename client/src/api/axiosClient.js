@@ -53,6 +53,22 @@ const shouldSkipAuthRetry = (config) => {
   );
 };
 
+// Multipart uploads: default Content-Type: application/json makes axios stringify FormData.
+// Remove it so the browser sets multipart/form-data with the correct boundary.
+axiosClient.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    const h = config.headers;
+    if (h && typeof h.delete === 'function') {
+      h.delete('Content-Type');
+      h.delete('content-type');
+    } else if (h) {
+      delete h['Content-Type'];
+      delete h['content-type'];
+    }
+  }
+  return config;
+});
+
 // Attach JWT for protected routes
 axiosClient.interceptors.request.use(
   (config) => {

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="No product photo">
+  <defs>
+    <linearGradient id="ph-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f1f5f9"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#ph-bg)"/>
+  <!-- plate -->
+  <ellipse cx="200" cy="175" rx="95" ry="38" fill="#cbd5e1" opacity="0.45"/>
+  <ellipse cx="200" cy="168" rx="78" ry="32" fill="#f8fafc" stroke="#94a3b8" stroke-width="2.5"/>
+  <!-- cloche / dome hint -->
+  <path d="M200 95c-42 0-76 34-76 76v8h152v-8c0-42-34-76-76-76z" fill="#94a3b8" opacity="0.25"/>
+  <ellipse cx="200" cy="168" rx="52" ry="20" fill="#e2e8f0" opacity="0.9"/>
+  <!-- fork left -->
+  <g fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" opacity="0.6">
+    <path d="M118 200v-55M112 145v55M124 145v55"/>
+  </g>
+  <!-- spoon right -->
+  <g fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" opacity="0.6">
+    <path d="M282 200v-60"/>
+    <ellipse cx="282" cy="138" rx="6" ry="10" fill="#64748b" opacity="0.5" stroke="none"/>
+  </g>
+</svg>

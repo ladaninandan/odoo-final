@@ -18,9 +18,7 @@ import {
   Search, Plus, Minus, ShoppingCart, Send, Loader2, X, User, Phone, MessageSquare, Package,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getServerOrigin } from '../../utils/lanServerUrl';
-
-const API_URL = getServerOrigin();
+import { getMediaAbsoluteUrl } from '../../utils/lanServerUrl';
 
 /** Order still in progress — resume / merge allowed */
 const ACTIVE_SELF_ORDER_STATUSES = ['draft', 'sent_to_kitchen', 'ready'];
@@ -274,7 +272,7 @@ const SelfOrderMenu = () => {
                 >
                   <div className="aspect-[4/3] sm:aspect-[16/10] w-full bg-muted overflow-hidden shrink-0 flex items-center justify-center">
                     {p.image ? (
-                      <img src={`${API_URL}${p.image}`} alt={p.name} className="w-full h-full object-cover" />
+                      <img src={getMediaAbsoluteUrl(p.image)} alt={p.name} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="h-16 w-16 text-muted-foreground/35" strokeWidth={1} />
                     )}
@@ -334,7 +332,7 @@ const SelfOrderMenu = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="h-9 w-9 rounded-md bg-muted shrink-0 overflow-hidden flex items-center justify-center border border-border/50">
                         {item.image ? (
-                          <img src={`${API_URL}${item.image}`} alt="" className="h-full w-full object-cover" />
+                          <img src={getMediaAbsoluteUrl(item.image)} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <Package className="h-4 w-4 text-muted-foreground/40" strokeWidth={1.5} />
                         )}
@@ -386,7 +384,7 @@ const SelfOrderMenu = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-8 w-8 rounded bg-muted shrink-0 overflow-hidden flex items-center justify-center">
                       {item.image ? (
-                        <img src={`${API_URL}${item.image}`} alt="" className="h-full w-full object-cover" />
+                        <img src={getMediaAbsoluteUrl(item.image)} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <Package className="h-3.5 w-3.5 text-muted-foreground/40" />
                       )}

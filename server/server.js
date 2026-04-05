@@ -66,7 +66,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Security HTTP Headers
+// Uploaded images must be served *before* Helmet. Otherwise Cross-Origin-Resource-Policy: same-origin
+// blocks <img> on the React app (port 3000) from loading files from the API (port 5000).
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Security HTTP Headers (API + HTML responses from this server only)
 app.use(helmet());
 
 // Rate limiting — default 200/15min is too low for SPAs that poll (e.g. payment screen every 4s).
@@ -96,9 +100,6 @@ app.use(cors({
   origin: corsAllowed,
   credentials: true,
 }));
-
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);

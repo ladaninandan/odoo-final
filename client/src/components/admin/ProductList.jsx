@@ -19,9 +19,7 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Pencil, Trash2, Package, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getServerOrigin } from '../../utils/lanServerUrl';
-
-const API_URL = getServerOrigin();
+import { getMediaAbsoluteUrl } from '../../utils/lanServerUrl';
 
 const emptyForm = { name: '', category: '', price: '', description: '', taxRate: 5, sendToKitchen: true, isActive: true };
 
@@ -50,7 +48,7 @@ const ProductList = () => {
       if (f) return URL.createObjectURL(f);
       if (editId) {
         const p = products.find((x) => x._id === editId);
-        return p?.image ? `${API_URL}${p.image}` : null;
+        return p?.image ? getMediaAbsoluteUrl(p.image) : null;
       }
       return null;
     });
@@ -76,7 +74,7 @@ const ProductList = () => {
     });
     setEditId(product._id);
     setImageFile(null);
-    setImagePreviewUrl(product.image ? `${API_URL}${product.image}` : null);
+    setImagePreviewUrl(product.image ? getMediaAbsoluteUrl(product.image) : null);
     setDialogOpen(true);
   };
 
@@ -145,7 +143,7 @@ const ProductList = () => {
               <TableRow key={p._id}>
                 <TableCell>
                   {p.image ? (
-                    <img src={`${API_URL}${p.image}`} alt={p.name} className="h-10 w-10 rounded object-cover" />
+                    <img src={getMediaAbsoluteUrl(p.image)} alt={p.name} className="h-10 w-10 rounded object-cover" />
                   ) : (
                     <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
                       <Package className="h-4 w-4 text-muted-foreground" />

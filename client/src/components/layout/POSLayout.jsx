@@ -1,15 +1,30 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import TopMenu from './TopMenu';
+import POSSidebar from './POSSidebar';
 import { Toaster } from '../ui/Toaster';
 
-const POSLayout = () => {
+/** Full-width order & payment flows — hide sidebar for more working space */
+function useHidePosSidebar() {
+  const { pathname } = useLocation();
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <TopMenu />
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+    /^\/pos\/order\/[^/]+/.test(pathname) ||
+    /^\/pos\/payment\/[^/]+/.test(pathname)
+  );
+}
+
+const POSLayout = () => {
+  const hideSidebar = useHidePosSidebar();
+
+  return (
+    <div className="h-screen flex bg-slate-50 overflow-hidden">
+      {!hideSidebar && <POSSidebar />}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopMenu />
+        <main className="flex-1 overflow-auto min-h-0">
+          <Outlet />
+        </main>
+      </div>
       <Toaster />
     </div>
   );
